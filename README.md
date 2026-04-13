@@ -1,0 +1,211 @@
+# react-native-accessibility-controller
+
+[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![npm version](https://img.shields.io/npm/v/react-native-accessibility-controller.svg)](https://www.npmjs.com/package/react-native-accessibility-controller)
+[![build](https://img.shields.io/github/actions/workflow/status/bedda-tech/react-native-accessibility-controller/ci.yml?branch=main)](https://github.com/bedda-tech/react-native-accessibility-controller/actions)
+
+**Android AccessibilityService for React Native.** Full read/write access to any app's UI tree, coordinate-based gestures, and system actions -- all from JavaScript.
+
+Part of the [Deft](https://github.com/bedda-tech/deft) ecosystem: an open-source, fully on-device AI phone agent.
+
+---
+
+## Architecture
+
+```
+ React Native (JavaScript)
+         |
+         v
+ TurboModule Bridge (Kotlin)
+         |
+         v
+ AccessibilityControllerModule.kt -----> AccessibilityControllerService.kt
+         |                                         |
+         |   getAccessibilityTree()                |   onAccessibilityEvent()
+         |   performAction()                       |   rootInActiveWindow
+         |   tap(x, y) / swipe(...)                |   dispatchGesture()
+         |   globalAction()                        |   performGlobalAction()
+         |                                         |
+         v                                         v
+ +-------------------------------------------------+
+ |            Android AccessibilityService          |
+ |  (system-level access to any foreground app)     |
+ +-------------------------------------------------+
+         |
+         v
+   Any app on screen
+```
+
+## Features
+
+- **Screen reading** -- capture the full accessibility tree of any app, serialise to text, or take screenshots
+- **Node actions** -- tap, long press, set text, scroll any UI element by its accessibility node ID
+- **Coordinate gestures** -- tap, long press, and swipe at arbitrary screen coordinates
+- **Global actions** -- home, back, recents, notifications, open any app by package name
+- **Overlay** -- floating overlay window for agent UI
+- **Event streaming** -- subscribe to real-time accessibility and window-change events
+- **Service lifecycle** -- check status and prompt the user to enable the service
+
+## Installation
+
+```bash
+npm install react-native-accessibility-controller
+# or
+yarn add react-native-accessibility-controller
+```
+
+### Requirements
+
+- React Native >= 0.76 (New Architecture)
+- Android only (iOS is a no-op stub)
+
+### Android Setup
+
+Add the service declaration to your app's `AndroidManifest.xml`:
+
+```xml
+<service
+    android:name="com.beddatech.accessibilitycontroller.AccessibilityControllerService"
+    android:exported="false"
+    android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+    <intent-filter>
+        <action android:name="android.accessibilityservice.AccessibilityService" />
+    </intent-filter>
+    <meta-data
+        android:name="android.accessibilityservice"
+        android:resource="@xml/accessibility_service_config" />
+</service>
+```
+
+## API
+
+### Screen Reading
+
+```typescript
+import {
+  getAccessibilityTree,
+  getScreenText,
+  takeScreenshot,
+} from 'react-native-accessibility-controller';
+
+// Full tree
+const tree = await getAccessibilityTree();
+
+// Serialised text (useful as LLM input)
+const text = await getScreenText();
+
+// Base64 screenshot
+const base64 = await takeScreenshot();
+```
+
+### Node Actions
+
+```typescript
+import {
+  tapNode,
+  longPressNode,
+  setNodeText,
+  scrollNode,
+  performAction,
+} from 'react-native-accessibility-controller';
+
+await tapNode('node-42');
+await longPressNode('node-42');
+await setNodeText('input-7', 'Hello world');
+await scrollNode('list-1', 'down');
+await performAction('node-42', 'select');
+```
+
+### Coordinate Gestures
+
+```typescript
+import { tap, longPress, swipe } from 'react-native-accessibility-controller';
+
+await tap(500, 800);
+await longPress(500, 800);
+await swipe(200, 1000, 200, 400, 300); // swipe up, 300ms
+```
+
+### Global Actions
+
+```typescript
+import { globalAction, openApp } from 'react-native-accessibility-controller';
+
+await globalAction('home');
+await globalAction('back');
+await openApp('com.android.settings');
+```
+
+### Overlay
+
+```typescript
+import { showOverlay, hideOverlay } from 'react-native-accessibility-controller';
+
+await showOverlay({ width: 200, height: 100, gravity: 'top-right' });
+await hideOverlay();
+```
+
+### Event Streaming
+
+```typescript
+import {
+  onAccessibilityEvent,
+  onWindowChange,
+} from 'react-native-accessibility-controller';
+
+const sub = onAccessibilityEvent((event) => {
+  console.log(event.eventType, event.packageName);
+});
+
+// Later:
+sub.remove();
+```
+
+### Service Lifecycle
+
+```typescript
+import {
+  isServiceEnabled,
+  requestServiceEnable,
+} from 'react-native-accessibility-controller';
+
+const enabled = await isServiceEnabled();
+if (!enabled) {
+  await requestServiceEnable(); // Opens Android settings
+}
+```
+
+## Types
+
+```typescript
+interface AccessibilityNode {
+  nodeId: string;
+  className: string;
+  text: string | null;
+  contentDescription: string | null;
+  bounds: { left: number; top: number; right: number; bottom: number };
+  isClickable: boolean;
+  isScrollable: boolean;
+  isEditable: boolean;
+  isFocused: boolean;
+  children: AccessibilityNode[];
+  availableActions: NodeAction[];
+}
+
+type NodeAction = 'click' | 'longClick' | 'scrollForward' | 'scrollBackward' | 'setText' | 'clearFocus' | 'select';
+type GlobalAction = 'home' | 'back' | 'recents' | 'notifications' | 'quickSettings' | 'powerDialog';
+type ScrollDirection = 'up' | 'down' | 'left' | 'right';
+```
+
+## Deft Ecosystem
+
+| Package | Description |
+|---------|-------------|
+| [react-native-accessibility-controller](https://github.com/bedda-tech/react-native-accessibility-controller) | Android AccessibilityService for React Native (this repo) |
+| [react-native-device-agent](https://github.com/bedda-tech/react-native-device-agent) | Agent loop connecting LLM to phone control |
+| [react-native-executorch](https://github.com/bedda-tech/react-native-executorch) | On-device LLM inference (Gemma 4) via ExecuTorch |
+| [deft](https://github.com/bedda-tech/deft) | The consumer app combining all three |
+
+## License
+
+MIT
