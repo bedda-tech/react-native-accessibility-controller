@@ -62,12 +62,28 @@ class AccessibilityControllerModule(
 
     @ReactMethod
     fun getAccessibilityTree(promise: Promise) {
-        promise.reject("ERR_NOT_IMPLEMENTED", "getAccessibilityTree is not yet implemented")
+        try {
+            if (AccessibilityControllerService.instance == null) {
+                promise.reject("ERR_SERVICE_DISABLED", "AccessibilityService is not enabled")
+                return
+            }
+            promise.resolve(ScreenReader.getTree())
+        } catch (e: Exception) {
+            promise.reject("ERR_GET_TREE", "Failed to capture accessibility tree", e)
+        }
     }
 
     @ReactMethod
     fun getScreenText(promise: Promise) {
-        promise.reject("ERR_NOT_IMPLEMENTED", "getScreenText is not yet implemented")
+        try {
+            if (AccessibilityControllerService.instance == null) {
+                promise.reject("ERR_SERVICE_DISABLED", "AccessibilityService is not enabled")
+                return
+            }
+            promise.resolve(ScreenReader.getText())
+        } catch (e: Exception) {
+            promise.reject("ERR_GET_TEXT", "Failed to capture screen text", e)
+        }
     }
 
     @ReactMethod
