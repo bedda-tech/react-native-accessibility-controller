@@ -50,5 +50,13 @@
     "react": "^18.0.0",
     "react-native": "^0.76.0",
     "typescript": "^5.0.0"
+  },
+  "codegenConfig": {
+    "name": "RNAccessibilityControllerSpec",
+    "type": "modules",
+    "jsSrcsDir": "src",
+    "android": {
+      "javaPackageName": "com.beddatech.accessibilitycontroller"
+    }
   }
 }

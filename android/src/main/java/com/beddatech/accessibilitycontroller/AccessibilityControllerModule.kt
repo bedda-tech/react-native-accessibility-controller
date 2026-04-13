@@ -1,18 +1,26 @@
 package com.beddatech.accessibilitycontroller
 
+import android.content.ComponentName
+import android.content.Intent
+import android.provider.Settings
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.ReadableMap
 import com.facebook.react.module.annotations.ReactModule
+import java.lang.ref.WeakReference
 
 /**
  * TurboModule entry point for react-native-accessibility-controller.
  *
- * Bridges JavaScript calls to the underlying AccessibilityService via
- * [AccessibilityControllerService]. All methods return Promises that
- * resolve once the native operation completes.
+ * Bridges JavaScript calls to the underlying [AccessibilityControllerService].
+ * All methods return Promises that resolve once the native operation completes.
+ *
+ * Event streaming: JS can subscribe via NativeEventEmitter. Two events are
+ * emitted by [AccessibilityControllerService]:
+ *   - "onAccessibilityEvent" -- raw a11y events from any foreground app
+ *   - "onWindowChange"       -- window focus / foreground app change
  */
 @ReactModule(name = AccessibilityControllerModule.NAME)
 class AccessibilityControllerModule(
@@ -23,7 +31,30 @@ class AccessibilityControllerModule(
         const val NAME = "AccessibilityController"
     }
 
+    init {
+        // Provide the ReactApplicationContext to the service so it can emit
+        // events back to JS without a direct dependency on this module.
+        AccessibilityControllerService.reactContextRef =
+            WeakReference(reactContext)
+    }
+
     override fun getName(): String = NAME
+
+    // -----------------------------------------------------------------------
+    // NativeEventEmitter plumbing (required by React Native)
+    // -----------------------------------------------------------------------
+
+    /** Called when JS adds the first listener for a given event type. */
+    @ReactMethod
+    fun addListener(@Suppress("UNUSED_PARAMETER") eventName: String) {
+        // No-op: bookkeeping is handled by React Native internals.
+    }
+
+    /** Called when JS removes listeners. */
+    @ReactMethod
+    fun removeListeners(@Suppress("UNUSED_PARAMETER") count: Int) {
+        // No-op: bookkeeping is handled by React Native internals.
+    }
 
     // -----------------------------------------------------------------------
     // Screen reading
@@ -129,13 +160,42 @@ class AccessibilityControllerModule(
     // Service lifecycle
     // -----------------------------------------------------------------------
 
+    /**
+     * Resolves `true` if the AccessibilityControllerService is currently
+     * listed in Android's enabled accessibility services.
+     */
     @ReactMethod
     fun isServiceEnabled(promise: Promise) {
-        promise.reject("ERR_NOT_IMPLEMENTED", "isServiceEnabled is not yet implemented")
+        try {
+            val context = reactApplicationContext
+            val enabled = Settings.Secure.getString(
+                context.contentResolver,
+                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+            )
+            val component = ComponentName(
+                context,
+                AccessibilityControllerService::class.java
+            ).flattenToString()
+            promise.resolve(enabled?.contains(component) == true)
+        } catch (e: Exception) {
+            promise.reject("ERR_SERVICE_CHECK", "Failed to read accessibility settings", e)
+        }
     }
 
+    /**
+     * Opens Android's Accessibility Settings screen so the user can enable
+     * the service manually (required by OS policy).
+     */
     @ReactMethod
     fun requestServiceEnable(promise: Promise) {
-        promise.reject("ERR_NOT_IMPLEMENTED", "requestServiceEnable is not yet implemented")
+        try {
+            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            reactApplicationContext.startActivity(intent)
+            promise.resolve(null)
+        } catch (e: Exception) {
+            promise.reject("ERR_SETTINGS_OPEN", "Failed to open accessibility settings", e)
+        }
     }
 }

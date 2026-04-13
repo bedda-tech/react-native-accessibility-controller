@@ -20,6 +20,18 @@ import type {
   Subscription,
 } from './types';
 
+import { NativeEventEmitter, Platform } from 'react-native';
+import NativeAccessibilityController from './NativeAccessibilityController';
+
+// ---------------------------------------------------------------------------
+// Event emitter (singleton) — only instantiated on Android
+// ---------------------------------------------------------------------------
+
+const emitter =
+  Platform.OS === 'android'
+    ? new NativeEventEmitter(NativeAccessibilityController)
+    : null;
+
 // ---------------------------------------------------------------------------
 // Screen reading
 // ---------------------------------------------------------------------------
@@ -28,21 +40,23 @@ import type {
  * Capture the full accessibility tree of the current screen.
  */
 export async function getAccessibilityTree(): Promise<AccessibilityNode[]> {
-  throw new Error('Not implemented: getAccessibilityTree');
+  return NativeAccessibilityController.getAccessibilityTree() as Promise<
+    AccessibilityNode[]
+  >;
 }
 
 /**
  * Get a serialised text representation of the current screen.
  */
 export async function getScreenText(): Promise<string> {
-  throw new Error('Not implemented: getScreenText');
+  return NativeAccessibilityController.getScreenText();
 }
 
 /**
  * Take a screenshot and return it as a base64-encoded image string.
  */
 export async function takeScreenshot(): Promise<string> {
-  throw new Error('Not implemented: takeScreenshot');
+  return NativeAccessibilityController.takeScreenshot();
 }
 
 // ---------------------------------------------------------------------------
@@ -56,21 +70,21 @@ export async function performAction(
   nodeId: string,
   action: NodeAction,
 ): Promise<boolean> {
-  throw new Error('Not implemented: performAction');
+  return NativeAccessibilityController.performAction(nodeId, action);
 }
 
 /**
  * Tap (click) a node.
  */
 export async function tapNode(nodeId: string): Promise<boolean> {
-  throw new Error('Not implemented: tapNode');
+  return NativeAccessibilityController.tapNode(nodeId);
 }
 
 /**
  * Long-press a node.
  */
 export async function longPressNode(nodeId: string): Promise<boolean> {
-  throw new Error('Not implemented: longPressNode');
+  return NativeAccessibilityController.longPressNode(nodeId);
 }
 
 /**
@@ -80,7 +94,7 @@ export async function setNodeText(
   nodeId: string,
   text: string,
 ): Promise<boolean> {
-  throw new Error('Not implemented: setNodeText');
+  return NativeAccessibilityController.setNodeText(nodeId, text);
 }
 
 /**
@@ -90,7 +104,7 @@ export async function scrollNode(
   nodeId: string,
   direction: ScrollDirection,
 ): Promise<boolean> {
-  throw new Error('Not implemented: scrollNode');
+  return NativeAccessibilityController.scrollNode(nodeId, direction);
 }
 
 // ---------------------------------------------------------------------------
@@ -101,14 +115,14 @@ export async function scrollNode(
  * Tap at screen coordinates.
  */
 export async function tap(x: number, y: number): Promise<boolean> {
-  throw new Error('Not implemented: tap');
+  return NativeAccessibilityController.tap(x, y);
 }
 
 /**
  * Long-press at screen coordinates.
  */
 export async function longPress(x: number, y: number): Promise<boolean> {
-  throw new Error('Not implemented: longPress');
+  return NativeAccessibilityController.longPress(x, y);
 }
 
 /**
@@ -119,9 +133,15 @@ export async function swipe(
   startY: number,
   endX: number,
   endY: number,
-  durationMs?: number,
+  durationMs: number = 300,
 ): Promise<boolean> {
-  throw new Error('Not implemented: swipe');
+  return NativeAccessibilityController.swipe(
+    startX,
+    startY,
+    endX,
+    endY,
+    durationMs,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -132,14 +152,14 @@ export async function swipe(
  * Execute a system-level global action (home, back, recents, etc.).
  */
 export async function globalAction(action: GlobalAction): Promise<boolean> {
-  throw new Error('Not implemented: globalAction');
+  return NativeAccessibilityController.globalAction(action);
 }
 
 /**
  * Open an app by its Android package name.
  */
 export async function openApp(packageName: string): Promise<boolean> {
-  throw new Error('Not implemented: openApp');
+  return NativeAccessibilityController.openApp(packageName);
 }
 
 // ---------------------------------------------------------------------------
@@ -150,14 +170,14 @@ export async function openApp(packageName: string): Promise<boolean> {
  * Show a floating overlay window with the given configuration.
  */
 export async function showOverlay(config: OverlayConfig): Promise<void> {
-  throw new Error('Not implemented: showOverlay');
+  return NativeAccessibilityController.showOverlay(config);
 }
 
 /**
  * Hide the floating overlay window.
  */
 export async function hideOverlay(): Promise<void> {
-  throw new Error('Not implemented: hideOverlay');
+  return NativeAccessibilityController.hideOverlay();
 }
 
 // ---------------------------------------------------------------------------
@@ -166,20 +186,38 @@ export async function hideOverlay(): Promise<void> {
 
 /**
  * Subscribe to raw accessibility events.
+ *
+ * Returns a Subscription — call `.remove()` to unsubscribe when done.
  */
 export function onAccessibilityEvent(
-  _callback: (event: A11yEvent) => void,
+  callback: (event: A11yEvent) => void,
 ): Subscription {
-  throw new Error('Not implemented: onAccessibilityEvent');
+  if (!emitter) {
+    console.warn(
+      'react-native-accessibility-controller: onAccessibilityEvent is only supported on Android',
+    );
+    return { remove: () => {} };
+  }
+  const sub = emitter.addListener('onAccessibilityEvent', callback);
+  return { remove: () => sub.remove() };
 }
 
 /**
  * Subscribe to window-change events.
+ *
+ * Returns a Subscription — call `.remove()` to unsubscribe when done.
  */
 export function onWindowChange(
-  _callback: (window: WindowInfo) => void,
+  callback: (window: WindowInfo) => void,
 ): Subscription {
-  throw new Error('Not implemented: onWindowChange');
+  if (!emitter) {
+    console.warn(
+      'react-native-accessibility-controller: onWindowChange is only supported on Android',
+    );
+    return { remove: () => {} };
+  }
+  const sub = emitter.addListener('onWindowChange', callback);
+  return { remove: () => sub.remove() };
 }
 
 // ---------------------------------------------------------------------------
@@ -190,12 +228,12 @@ export function onWindowChange(
  * Check whether the AccessibilityService is currently enabled.
  */
 export async function isServiceEnabled(): Promise<boolean> {
-  throw new Error('Not implemented: isServiceEnabled');
+  return NativeAccessibilityController.isServiceEnabled();
 }
 
 /**
  * Prompt the user to enable the AccessibilityService in Android settings.
  */
 export async function requestServiceEnable(): Promise<void> {
-  throw new Error('Not implemented: requestServiceEnable');
+  return NativeAccessibilityController.requestServiceEnable();
 }
