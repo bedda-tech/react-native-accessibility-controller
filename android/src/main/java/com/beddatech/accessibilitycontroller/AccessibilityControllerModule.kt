@@ -41,6 +41,24 @@ class AccessibilityControllerModule(
     override fun getName(): String = NAME
 
     // -----------------------------------------------------------------------
+    // Internal helpers
+    // -----------------------------------------------------------------------
+
+    /**
+     * Rejects [promise] with ERR_SERVICE_DISABLED and returns null if the
+     * AccessibilityService is not connected. Returns a non-null unit value
+     * otherwise (use as a guard: `requireService(promise) ?: return`).
+     */
+    private fun requireService(promise: Promise): Unit? {
+        return if (AccessibilityControllerService.instance == null) {
+            promise.reject("ERR_SERVICE_DISABLED", "AccessibilityService is not enabled")
+            null
+        } else {
+            Unit
+        }
+    }
+
+    // -----------------------------------------------------------------------
     // NativeEventEmitter plumbing (required by React Native)
     // -----------------------------------------------------------------------
 
@@ -97,27 +115,52 @@ class AccessibilityControllerModule(
 
     @ReactMethod
     fun performAction(nodeId: String, action: String, promise: Promise) {
-        promise.reject("ERR_NOT_IMPLEMENTED", "performAction is not yet implemented")
+        try {
+            requireService(promise) ?: return
+            promise.resolve(ActionDispatcher.performAction(nodeId, action))
+        } catch (e: Exception) {
+            promise.reject("ERR_PERFORM_ACTION", "performAction failed", e)
+        }
     }
 
     @ReactMethod
     fun tapNode(nodeId: String, promise: Promise) {
-        promise.reject("ERR_NOT_IMPLEMENTED", "tapNode is not yet implemented")
+        try {
+            requireService(promise) ?: return
+            promise.resolve(ActionDispatcher.tapNode(nodeId))
+        } catch (e: Exception) {
+            promise.reject("ERR_TAP_NODE", "tapNode failed", e)
+        }
     }
 
     @ReactMethod
     fun longPressNode(nodeId: String, promise: Promise) {
-        promise.reject("ERR_NOT_IMPLEMENTED", "longPressNode is not yet implemented")
+        try {
+            requireService(promise) ?: return
+            promise.resolve(ActionDispatcher.longPressNode(nodeId))
+        } catch (e: Exception) {
+            promise.reject("ERR_LONG_PRESS_NODE", "longPressNode failed", e)
+        }
     }
 
     @ReactMethod
     fun setNodeText(nodeId: String, text: String, promise: Promise) {
-        promise.reject("ERR_NOT_IMPLEMENTED", "setNodeText is not yet implemented")
+        try {
+            requireService(promise) ?: return
+            promise.resolve(ActionDispatcher.setNodeText(nodeId, text))
+        } catch (e: Exception) {
+            promise.reject("ERR_SET_NODE_TEXT", "setNodeText failed", e)
+        }
     }
 
     @ReactMethod
     fun scrollNode(nodeId: String, direction: String, promise: Promise) {
-        promise.reject("ERR_NOT_IMPLEMENTED", "scrollNode is not yet implemented")
+        try {
+            requireService(promise) ?: return
+            promise.resolve(ActionDispatcher.scrollNode(nodeId, direction))
+        } catch (e: Exception) {
+            promise.reject("ERR_SCROLL_NODE", "scrollNode failed", e)
+        }
     }
 
     // -----------------------------------------------------------------------
