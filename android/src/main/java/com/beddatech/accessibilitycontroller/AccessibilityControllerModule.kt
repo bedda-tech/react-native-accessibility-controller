@@ -169,12 +169,22 @@ class AccessibilityControllerModule(
 
     @ReactMethod
     fun tap(x: Double, y: Double, promise: Promise) {
-        promise.reject("ERR_NOT_IMPLEMENTED", "tap is not yet implemented")
+        try {
+            requireService(promise) ?: return
+            promise.resolve(GestureDispatcher.tap(x.toFloat(), y.toFloat()))
+        } catch (e: Exception) {
+            promise.reject("ERR_TAP", "tap failed", e)
+        }
     }
 
     @ReactMethod
     fun longPress(x: Double, y: Double, promise: Promise) {
-        promise.reject("ERR_NOT_IMPLEMENTED", "longPress is not yet implemented")
+        try {
+            requireService(promise) ?: return
+            promise.resolve(GestureDispatcher.longPress(x.toFloat(), y.toFloat()))
+        } catch (e: Exception) {
+            promise.reject("ERR_LONG_PRESS", "longPress failed", e)
+        }
     }
 
     @ReactMethod
@@ -184,7 +194,18 @@ class AccessibilityControllerModule(
         durationMs: Int,
         promise: Promise
     ) {
-        promise.reject("ERR_NOT_IMPLEMENTED", "swipe is not yet implemented")
+        try {
+            requireService(promise) ?: return
+            promise.resolve(
+                GestureDispatcher.swipe(
+                    startX.toFloat(), startY.toFloat(),
+                    endX.toFloat(), endY.toFloat(),
+                    durationMs.toLong(),
+                )
+            )
+        } catch (e: Exception) {
+            promise.reject("ERR_SWIPE", "swipe failed", e)
+        }
     }
 
     // -----------------------------------------------------------------------
