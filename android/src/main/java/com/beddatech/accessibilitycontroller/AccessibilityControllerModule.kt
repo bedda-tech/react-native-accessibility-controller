@@ -1,14 +1,21 @@
 package com.beddatech.accessibilitycontroller
 
+import android.accessibilityservice.AccessibilityService
+import android.annotation.SuppressLint
 import android.content.ComponentName
 import android.content.Intent
+import android.graphics.Bitmap
+import android.os.Build
 import android.provider.Settings
+import android.util.Base64
+import androidx.annotation.RequiresApi
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.ReadableMap
 import com.facebook.react.module.annotations.ReactModule
+import java.io.ByteArrayOutputStream
 import java.lang.ref.WeakReference
 
 /**
@@ -104,9 +111,54 @@ class AccessibilityControllerModule(
         }
     }
 
+    @SuppressLint("NewApi")   // guarded by the API-level check below
     @ReactMethod
     fun takeScreenshot(promise: Promise) {
-        promise.reject("ERR_NOT_IMPLEMENTED", "takeScreenshot is not yet implemented")
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            promise.reject(
+                "ERR_API_LEVEL",
+                "takeScreenshot requires Android 11 (API 30) or higher"
+            )
+            return
+        }
+        requireService(promise) ?: return
+        captureScreenshotApi30(promise)
+    }
+
+    @RequiresApi(Build.VERSION_CODES.R)
+    private fun captureScreenshotApi30(promise: Promise) {
+        try {
+            val service = AccessibilityControllerService.instance
+                ?: return promise.reject("ERR_SERVICE_DISABLED", "AccessibilityService is not enabled")
+            service.takeScreenshot(
+                0,   // Display.DEFAULT_DISPLAY
+                reactApplicationContext.mainExecutor,
+                object : AccessibilityService.TakeScreenshotCallback {
+                    override fun onSuccess(screenshot: AccessibilityService.ScreenCapture) {
+                        try {
+                            val hwBitmap  = screenshot.hardwareBitmap
+                            val swBitmap  = hwBitmap.copy(Bitmap.Config.ARGB_8888, false)
+                            val baos      = ByteArrayOutputStream()
+                            swBitmap.compress(Bitmap.CompressFormat.PNG, 100, baos)
+                            val base64    = Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP)
+                            swBitmap.recycle()
+                            screenshot.close()
+                            promise.resolve(base64)
+                        } catch (e: Exception) {
+                            promise.reject("ERR_SCREENSHOT_ENCODE", "Failed to encode screenshot", e)
+                        }
+                    }
+                    override fun onFailure(errorCode: Int) {
+                        promise.reject(
+                            "ERR_SCREENSHOT_FAILED",
+                            "Screenshot capture failed: errorCode=$errorCode"
+                        )
+                    }
+                }
+            )
+        } catch (e: Exception) {
+            promise.reject("ERR_SCREENSHOT", "takeScreenshot failed", e)
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -214,12 +266,42 @@ class AccessibilityControllerModule(
 
     @ReactMethod
     fun globalAction(action: String, promise: Promise) {
-        promise.reject("ERR_NOT_IMPLEMENTED", "globalAction is not yet implemented")
+        try {
+            requireService(promise) ?: return
+            val service = AccessibilityControllerService.instance!!
+            val actionId = when (action) {
+                "home"          -> AccessibilityService.GLOBAL_ACTION_HOME
+                "back"          -> AccessibilityService.GLOBAL_ACTION_BACK
+                "recents"       -> AccessibilityService.GLOBAL_ACTION_RECENTS
+                "notifications" -> AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS
+                "quickSettings" -> AccessibilityService.GLOBAL_ACTION_QUICK_SETTINGS
+                "powerDialog"   -> AccessibilityService.GLOBAL_ACTION_POWER_DIALOG
+                else -> {
+                    promise.reject("ERR_UNKNOWN_ACTION", "Unknown global action: $action")
+                    return
+                }
+            }
+            promise.resolve(service.performGlobalAction(actionId))
+        } catch (e: Exception) {
+            promise.reject("ERR_GLOBAL_ACTION", "globalAction failed", e)
+        }
     }
 
     @ReactMethod
     fun openApp(packageName: String, promise: Promise) {
-        promise.reject("ERR_NOT_IMPLEMENTED", "openApp is not yet implemented")
+        try {
+            val intent = reactApplicationContext.packageManager
+                .getLaunchIntentForPackage(packageName)
+            if (intent == null) {
+                promise.resolve(false)
+                return
+            }
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            reactApplicationContext.startActivity(intent)
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.reject("ERR_OPEN_APP", "openApp failed", e)
+        }
     }
 
     // -----------------------------------------------------------------------

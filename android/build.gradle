@@ -39,6 +39,7 @@ repositories {
 
 dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+    implementation 'androidx.annotation:annotation:1.7.1'
     // React Native is provided by the consuming app
     compileOnly 'com.facebook.react:react-android:+'
 }
