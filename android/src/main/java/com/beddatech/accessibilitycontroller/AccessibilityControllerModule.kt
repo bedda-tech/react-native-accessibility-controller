@@ -310,12 +310,18 @@ class AccessibilityControllerModule(
 
     @ReactMethod
     fun showOverlay(config: ReadableMap, promise: Promise) {
-        promise.reject("ERR_NOT_IMPLEMENTED", "showOverlay is not yet implemented")
+        OverlayManager.show(reactApplicationContext, config) { error ->
+            if (error == null) promise.resolve(null)
+            else promise.reject("ERR_OVERLAY_SHOW", error)
+        }
     }
 
     @ReactMethod
     fun hideOverlay(promise: Promise) {
-        promise.reject("ERR_NOT_IMPLEMENTED", "hideOverlay is not yet implemented")
+        OverlayManager.hide { error ->
+            if (error == null) promise.resolve(null)
+            else promise.reject("ERR_OVERLAY_HIDE", error)
+        }
     }
 
     // -----------------------------------------------------------------------
