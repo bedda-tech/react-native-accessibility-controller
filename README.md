@@ -206,6 +206,27 @@ type ScrollDirection = 'up' | 'down' | 'left' | 'right';
 | [react-native-executorch](https://github.com/bedda-tech/react-native-executorch) | On-device LLM inference (Gemma 4) via ExecuTorch |
 | [deft](https://github.com/bedda-tech/deft) | The consumer app combining all three |
 
+## Contributing
+
+Contributions are welcome. This library targets Android's AccessibilityService APIs, so a physical device or emulator with Android 10+ (API 30+) is needed for most testing.
+
+**Setup**
+
+```bash
+git clone https://github.com/bedda-tech/react-native-accessibility-controller.git
+cd react-native-accessibility-controller
+npm install
+```
+
+**Guidelines**
+
+- All new APIs must have TypeScript types exported from `src/index.ts`
+- Kotlin code should follow the existing singleton pattern (`ActionDispatcher`, `GestureDispatcher`)
+- `GestureDescription.StrokeDescription` requires duration >= 1ms -- coerce any zero values
+- Screenshot APIs require API 30+; guard with `Build.VERSION.SDK_INT >= Build.VERSION_CODES.R` and delegate to a `@RequiresApi(Build.VERSION_CODES.R)` private method
+- Hardware bitmaps must be copied to `ARGB_8888` before compression
+- Open an issue before starting large changes
+
 ## License
 
 MIT
