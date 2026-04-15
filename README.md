@@ -175,6 +175,70 @@ if (!enabled) {
 }
 ```
 
+### React Hooks
+
+Three hooks are provided for idiomatic React usage. They handle subscription
+cleanup and polling teardown automatically.
+
+#### `useAccessibilityTree(options?)`
+
+Fetches the accessibility tree on mount and (optionally) polls it on an
+interval. Returns `{ tree, loading, error, refresh }`.
+
+```tsx
+import { useAccessibilityTree } from 'react-native-accessibility-controller';
+
+function ScreenDebugger() {
+  const { tree, loading, error, refresh } = useAccessibilityTree({
+    pollIntervalMs: 1000,   // re-fetch every second
+    fetchOnMount: true,     // default
+  });
+
+  if (loading) return <ActivityIndicator />;
+  if (error)   return <Text>{error.message}</Text>;
+
+  return (
+    <View>
+      <Button title="Refresh" onPress={refresh} />
+      <Text>{tree?.length ?? 0} root nodes</Text>
+    </View>
+  );
+}
+```
+
+#### `useAccessibilityEvents(options?)`
+
+Subscribes to raw accessibility events and returns a rolling buffer (newest
+first). Defaults to keeping 50 events.
+
+```tsx
+import { useAccessibilityEvents } from 'react-native-accessibility-controller';
+
+function EventLog() {
+  const events = useAccessibilityEvents({ maxEvents: 20 });
+  return (
+    <>
+      {events.map((e, i) => (
+        <Text key={i}>{e.eventType} — {e.packageName}</Text>
+      ))}
+    </>
+  );
+}
+```
+
+#### `useWindowChange()`
+
+Returns the most recently focused window (or `null` before the first event).
+
+```tsx
+import { useWindowChange } from 'react-native-accessibility-controller';
+
+function ForegroundApp() {
+  const win = useWindowChange();
+  return <Text>Active: {win?.packageName ?? '—'}</Text>;
+}
+```
+
 ## Types
 
 ```typescript
@@ -195,6 +259,14 @@ interface AccessibilityNode {
 type NodeAction = 'click' | 'longClick' | 'scrollForward' | 'scrollBackward' | 'setText' | 'clearFocus' | 'select';
 type GlobalAction = 'home' | 'back' | 'recents' | 'notifications' | 'quickSettings' | 'powerDialog';
 type ScrollDirection = 'up' | 'down' | 'left' | 'right';
+
+interface OverlayConfig {
+  width: number;       // dp
+  height: number;      // dp
+  gravity?: string;    // 'top-right' | 'top-left' | 'top-center' | 'bottom-right' | 'bottom-left' | 'bottom-center' | 'center'
+  touchable?: boolean; // default false — overlay passes touches through
+  backgroundColor?: string; // hex, e.g. '#FF6B35CC' (RGBA)
+}
 ```
 
 ## Deft Ecosystem
@@ -205,6 +277,21 @@ type ScrollDirection = 'up' | 'down' | 'left' | 'right';
 | [react-native-device-agent](https://github.com/bedda-tech/react-native-device-agent) | Agent loop connecting LLM to phone control |
 | [react-native-executorch](https://github.com/bedda-tech/react-native-executorch) | On-device LLM inference (Gemma 4) via ExecuTorch |
 | [deft](https://github.com/bedda-tech/deft) | The consumer app combining all three |
+
+## Example App
+
+`example/src/App.tsx` is a single-screen React Native app that exercises
+every API: screen reading, node tap, gestures, global actions, overlay, and
+live event streaming.
+
+```bash
+cd example
+npm install
+npx react-native run-android
+```
+
+Requires the Accessibility Service to be enabled for the demo app in
+**Settings → Accessibility → Accessibility Controller**.
 
 ## Contributing
 

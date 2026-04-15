@@ -237,3 +237,19 @@ export async function isServiceEnabled(): Promise<boolean> {
 export async function requestServiceEnable(): Promise<void> {
   return NativeAccessibilityController.requestServiceEnable();
 }
+
+// ---------------------------------------------------------------------------
+// React hooks
+// ---------------------------------------------------------------------------
+
+export type {
+  UseAccessibilityTreeOptions,
+  UseAccessibilityTreeResult,
+  UseAccessibilityEventsOptions,
+} from './hooks';
+
+export {
+  useAccessibilityTree,
+  useAccessibilityEvents,
+  useWindowChange,
+} from './hooks';
