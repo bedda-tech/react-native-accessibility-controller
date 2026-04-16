@@ -48,15 +48,29 @@ export type ScrollDirection = 'up' | 'down' | 'left' | 'right';
  */
 export interface OverlayConfig {
   /** Width in density-independent pixels. */
-  width: number;
+  width?: number;
   /** Height in density-independent pixels. */
-  height: number;
+  height?: number;
   /** Gravity/position on screen (e.g., 'top-right', 'bottom-center'). */
   gravity?: string;
   /** Whether the overlay should be interactive. */
   touchable?: boolean;
   /** Background color (hex string). */
   backgroundColor?: string;
+  /** Initial action text to display. */
+  action?: string;
+  /** Initial step count to display. */
+  stepCount?: number;
+}
+
+/**
+ * Content update for the agent-status overlay.
+ */
+export interface OverlayUpdateConfig {
+  /** Current action being performed by the agent. */
+  action: string;
+  /** Current step number in the agent loop. */
+  stepCount: number;
 }
 
 /**

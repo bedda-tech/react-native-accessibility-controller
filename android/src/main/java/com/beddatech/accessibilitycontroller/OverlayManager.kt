@@ -3,57 +3,57 @@ package com.beddatech.accessibilitycontroller
 import android.content.Context
 import android.graphics.Color
 import android.graphics.PixelFormat
+import android.graphics.Typeface
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
 import android.view.Gravity
-import android.view.View
 import android.view.WindowManager
+import android.widget.Button
+import android.widget.LinearLayout
+import android.widget.TextView
 import com.facebook.react.bridge.ReadableMap
 
 /**
- * Manages a single SYSTEM_ALERT_WINDOW overlay drawn on top of all apps.
+ * Manages a SYSTEM_ALERT_WINDOW overlay drawn on top of all apps.
  *
- * The overlay is a plain [View] whose background colour, size, and gravity
- * are set by the JS caller. The host app must hold the
- * `SYSTEM_ALERT_WINDOW` permission (requested at runtime via
- * `Settings.ACTION_MANAGE_OVERLAY_PERMISSION`).
+ * The overlay renders a compact agent-status indicator showing:
+ *   - Current action text (1 line, truncated)
+ *   - Step count
+ *   - Stop button (fires [onStopRequested])
  *
- * All WindowManager operations are dispatched on the main thread.
+ * Call [update] to refresh content without rebuilding the window.
+ * Call [hide] to remove it.
+ *
+ * The host app must hold the SYSTEM_ALERT_WINDOW permission.
  */
 object OverlayManager {
 
     private val mainHandler = Handler(Looper.getMainLooper())
 
-    private var overlayView: View? = null
+    private var rootLayout: LinearLayout? = null
+    private var actionLabel: TextView? = null
+    private var stepLabel: TextView? = null
     private var windowManager: WindowManager? = null
 
     /**
-     * Returns `true` when the overlay permission has been granted.
-     * On Android 6+ (M) this requires the user to explicitly allow it in
-     * Settings.  On older versions it is granted automatically.
+     * Invoked on the main thread when the user taps the Stop button.
+     * Set this before calling [show]; cleared by [hide].
      */
-    fun canDrawOverlays(context: Context): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            Settings.canDrawOverlays(context)
-        } else {
-            true
-        }
-    }
+    var onStopRequested: (() -> Unit)? = null
+
+    /** Returns true when the SYSTEM_ALERT_WINDOW permission has been granted. */
+    fun canDrawOverlays(context: Context): Boolean =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) Settings.canDrawOverlays(context) else true
 
     /**
-     * Shows the overlay window with the given [config].
+     * Shows the floating agent-status overlay.
      *
-     * Config keys (all optional except width/height):
-     *  - width  (number, dp)
-     *  - height (number, dp)
-     *  - gravity (string: "top-right" | "top-left" | "top-center" |
-     *             "bottom-right" | "bottom-left" | "bottom-center" | "center")
-     *  - touchable (boolean, default false)
-     *  - backgroundColor (string, hex colour like "#FF0000", default transparent)
-     *
-     * Must be called from any thread; dispatches to the main thread internally.
+     * Config keys (all optional):
+     *   - action     (string)  – initial action text shown in the indicator
+     *   - stepCount  (number)  – initial step number
+     *   - gravity    (string)  – "top-right" | "top-left" | ... (default "top-right")
      */
     fun show(context: Context, config: ReadableMap, onResult: (error: String?) -> Unit) {
         if (!canDrawOverlays(context)) {
@@ -61,56 +61,39 @@ object OverlayManager {
             return
         }
 
-        val widthDp   = if (config.hasKey("width"))           config.getDouble("width").toFloat()        else 200f
-        val heightDp  = if (config.hasKey("height"))          config.getDouble("height").toFloat()       else 100f
-        val gravityStr = if (config.hasKey("gravity"))        config.getString("gravity") ?: "top-right" else "top-right"
-        val touchable  = if (config.hasKey("touchable"))      config.getBoolean("touchable")             else false
-        val bgHex      = if (config.hasKey("backgroundColor")) config.getString("backgroundColor")       else null
+        val gravityStr    = if (config.hasKey("gravity"))    config.getString("gravity")                ?: "top-right" else "top-right"
+        val initialAction = if (config.hasKey("action"))     config.getString("action")                 ?: ""          else ""
+        val initialStep   = if (config.hasKey("stepCount"))  config.getDouble("stepCount").toInt()                     else 0
 
         mainHandler.post {
             try {
-                val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-                val density  = context.resources.displayMetrics.density
-                val widthPx  = (widthDp  * density).toInt()
-                val heightPx = (heightDp * density).toInt()
+                val wm      = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+                val density = context.resources.displayMetrics.density
 
-                val windowType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val windowType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
                     WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-                } else {
-                    @Suppress("DEPRECATION")
-                    WindowManager.LayoutParams.TYPE_PHONE
-                }
-
-                var flags = (WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                        or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN)
-                if (!touchable) {
-                    flags = flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-                }
+                else
+                    @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_PHONE
 
                 val params = WindowManager.LayoutParams(
-                    widthPx,
-                    heightPx,
+                    WindowManager.LayoutParams.WRAP_CONTENT,
+                    WindowManager.LayoutParams.WRAP_CONTENT,
                     windowType,
-                    flags,
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                     PixelFormat.TRANSLUCENT
                 ).apply {
                     gravity = parseGravity(gravityStr)
+                    x = (8 * density).toInt()
+                    y = (56 * density).toInt() // below the status bar
                 }
 
-                val bgColor = try {
-                    if (bgHex != null) Color.parseColor(bgHex) else Color.TRANSPARENT
-                } catch (_: IllegalArgumentException) {
-                    Color.TRANSPARENT
-                }
-
-                val view = View(context).apply { setBackgroundColor(bgColor) }
-
-                // Remove any existing overlay before adding a new one
+                val layout = buildLayout(context, initialAction, initialStep)
                 removeExisting(wm)
+                wm.addView(layout, params)
 
-                wm.addView(view, params)
-                overlayView    = view
-                windowManager  = wm
+                rootLayout    = layout
+                windowManager = wm
                 onResult(null)
             } catch (e: Exception) {
                 onResult(e.message ?: "showOverlay failed")
@@ -119,8 +102,23 @@ object OverlayManager {
     }
 
     /**
+     * Updates the action text and step count on the existing overlay.
+     * No-op if the overlay is not currently shown.
+     */
+    fun update(action: String, step: Int, onResult: (error: String?) -> Unit) {
+        mainHandler.post {
+            try {
+                actionLabel?.text = action.ifEmpty { "Working..." }
+                stepLabel?.text   = if (step > 0) "Step $step" else ""
+                onResult(null)
+            } catch (e: Exception) {
+                onResult(e.message ?: "updateOverlay failed")
+            }
+        }
+    }
+
+    /**
      * Removes the overlay window if one is currently shown.
-     * Must be called from any thread; dispatches to the main thread.
      */
     fun hide(onResult: (error: String?) -> Unit) {
         mainHandler.post {
@@ -133,14 +131,81 @@ object OverlayManager {
         }
     }
 
-    private fun removeExisting(wm: WindowManager?) {
-        val view = overlayView ?: return
-        try {
-            (wm ?: windowManager)?.removeView(view)
-        } catch (_: Exception) {
-            // View may already have been detached
+    // -----------------------------------------------------------------------
+    // Internal helpers
+    // -----------------------------------------------------------------------
+
+    private fun buildLayout(context: Context, action: String, step: Int): LinearLayout {
+        val density = context.resources.displayMetrics.density
+
+        val root = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(
+                (10 * density).toInt(),
+                (8 * density).toInt(),
+                (10 * density).toInt(),
+                (8 * density).toInt()
+            )
+            // Semi-transparent dark background (0xE6 = 90% opacity)
+            setBackgroundColor(0xE6161616.toInt())
+            minimumWidth = (180 * density).toInt()
         }
-        overlayView   = null
+
+        // Top row: action label + stop button
+        val topRow = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity     = Gravity.CENTER_VERTICAL
+        }
+
+        val actionTv = TextView(context).apply {
+            text      = action.ifEmpty { "Working..." }
+            textSize  = 12f
+            setTextColor(0xFFE5E5E5.toInt())
+            maxLines  = 1
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+
+        val stopBtn = Button(context).apply {
+            text = "\u25A0" // ■ stop symbol
+            textSize = 14f
+            setTextColor(0xFFFF6B6B.toInt())
+            setTypeface(null, Typeface.BOLD)
+            minWidth      = (32 * density).toInt()
+            minimumWidth  = (32 * density).toInt()
+            minHeight     = (24 * density).toInt()
+            minimumHeight = (24 * density).toInt()
+            setPadding(
+                (6 * density).toInt(), 0,
+                (6 * density).toInt(), 0
+            )
+            setBackgroundColor(Color.TRANSPARENT)
+            setOnClickListener { onStopRequested?.invoke() }
+        }
+
+        topRow.addView(actionTv)
+        topRow.addView(stopBtn)
+        root.addView(topRow)
+
+        // Step count label (smaller, dimmer)
+        val stepTv = TextView(context).apply {
+            text     = if (step > 0) "Step $step" else ""
+            textSize = 10f
+            setTextColor(0xFF888888.toInt())
+        }
+        root.addView(stepTv)
+
+        actionLabel = actionTv
+        stepLabel   = stepTv
+
+        return root
+    }
+
+    private fun removeExisting(wm: WindowManager?) {
+        val view = rootLayout ?: return
+        try { (wm ?: windowManager)?.removeView(view) } catch (_: Exception) {}
+        rootLayout    = null
+        actionLabel   = null
+        stepLabel     = null
         windowManager = null
     }
 

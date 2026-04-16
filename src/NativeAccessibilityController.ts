@@ -41,6 +41,7 @@ export interface Spec extends TurboModule {
 
   // Overlay
   showOverlay(config: Object): Promise<void>;
+  updateOverlay(config: Object): Promise<void>;
   hideOverlay(): Promise<void>;
 
   // Service lifecycle

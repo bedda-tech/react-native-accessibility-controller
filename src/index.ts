@@ -4,6 +4,7 @@ export type {
   GlobalAction,
   ScrollDirection,
   OverlayConfig,
+  OverlayUpdateConfig,
   A11yEvent,
   WindowInfo,
   Subscription,
@@ -15,6 +16,7 @@ import type {
   GlobalAction,
   ScrollDirection,
   OverlayConfig,
+  OverlayUpdateConfig,
   A11yEvent,
   WindowInfo,
   Subscription,
@@ -174,10 +176,35 @@ export async function showOverlay(config: OverlayConfig): Promise<void> {
 }
 
 /**
+ * Update the content of the agent-status overlay (action text + step count).
+ * No-op if no overlay is currently shown.
+ */
+export async function updateOverlay(config: OverlayUpdateConfig): Promise<void> {
+  return NativeAccessibilityController.updateOverlay(config);
+}
+
+/**
  * Hide the floating overlay window.
  */
 export async function hideOverlay(): Promise<void> {
   return NativeAccessibilityController.hideOverlay();
+}
+
+/**
+ * Subscribe to the overlay stop button tap event.
+ * Fired when the user taps the Stop (■) button in the agent-status overlay.
+ *
+ * Returns a Subscription — call `.remove()` to unsubscribe.
+ */
+export function onOverlayStop(callback: () => void): Subscription {
+  if (!emitter) {
+    console.warn(
+      'react-native-accessibility-controller: onOverlayStop is only supported on Android',
+    );
+    return { remove: () => {} };
+  }
+  const sub = emitter.addListener('onOverlayStop', callback);
+  return { remove: () => sub.remove() };
 }
 
 // ---------------------------------------------------------------------------

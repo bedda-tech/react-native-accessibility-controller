@@ -9,12 +9,14 @@ import android.os.Build
 import android.provider.Settings
 import android.util.Base64
 import androidx.annotation.RequiresApi
+import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.ReadableMap
 import com.facebook.react.module.annotations.ReactModule
+import com.facebook.react.modules.core.DeviceEventManagerModule
 import java.io.ByteArrayOutputStream
 import java.lang.ref.WeakReference
 
@@ -43,6 +45,15 @@ class AccessibilityControllerModule(
         // events back to JS without a direct dependency on this module.
         AccessibilityControllerService.reactContextRef =
             WeakReference(reactContext)
+
+        // Wire the overlay stop button to emit an "onOverlayStop" event to JS.
+        OverlayManager.onStopRequested = {
+            try {
+                reactContext
+                    .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+                    .emit("onOverlayStop", Arguments.createMap())
+            } catch (_: Exception) {}
+        }
     }
 
     override fun getName(): String = NAME
@@ -321,6 +332,24 @@ class AccessibilityControllerModule(
         OverlayManager.hide { error ->
             if (error == null) promise.resolve(null)
             else promise.reject("ERR_OVERLAY_HIDE", error)
+        }
+    }
+
+    /**
+     * Update the content of the existing overlay (action text + step count).
+     * No-op if no overlay is currently shown.
+     *
+     * Config keys:
+     *   - action    (string) – current action text
+     *   - stepCount (number) – current step number
+     */
+    @ReactMethod
+    fun updateOverlay(config: ReadableMap, promise: Promise) {
+        val action = if (config.hasKey("action"))    config.getString("action")            ?: "" else ""
+        val step   = if (config.hasKey("stepCount")) config.getDouble("stepCount").toInt()       else 0
+        OverlayManager.update(action, step) { error ->
+            if (error == null) promise.resolve(null)
+            else promise.reject("ERR_OVERLAY_UPDATE", error)
         }
     }
 
