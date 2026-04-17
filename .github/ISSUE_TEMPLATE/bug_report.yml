@@ -1,0 +1,64 @@
+name: Bug Report
+description: Something isn't working correctly
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please fill in as much detail as possible.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Enable Deft accessibility service
+        2. Call AccessibilityController.tap(...)
+        3. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Package version
+      placeholder: e.g. 0.1.0
+    validations:
+      required: true
+
+  - type: input
+    id: rn_version
+    attributes:
+      label: React Native version
+      placeholder: e.g. 0.76.5
+    validations:
+      required: true
+
+  - type: input
+    id: device
+    attributes:
+      label: Device / Android version
+      placeholder: e.g. Pixel 8, Android 15 (API 35)
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: service
+    attributes:
+      label: Accessibility service
+      options:
+        - label: The Deft AccessibilityService is enabled in Android Settings
