@@ -47,6 +47,7 @@ export interface Spec extends TurboModule {
   // Service lifecycle
   isServiceEnabled(): Promise<boolean>;
   requestServiceEnable(): Promise<void>;
+  canDrawOverlays(): Promise<boolean>;
 
   // Required by NativeEventEmitter
   addListener(eventName: string): void;

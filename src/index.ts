@@ -265,6 +265,15 @@ export async function requestServiceEnable(): Promise<void> {
   return NativeAccessibilityController.requestServiceEnable();
 }
 
+/**
+ * Check whether the SYSTEM_ALERT_WINDOW ("Draw over other apps") permission
+ * has been granted. Returns true on non-Android platforms.
+ */
+export async function canDrawOverlays(): Promise<boolean> {
+  if (Platform.OS !== 'android') return true;
+  return NativeAccessibilityController.canDrawOverlays();
+}
+
 // ---------------------------------------------------------------------------
 // React hooks
 // ---------------------------------------------------------------------------

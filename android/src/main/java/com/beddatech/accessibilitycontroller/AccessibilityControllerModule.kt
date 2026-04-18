@@ -395,4 +395,17 @@ class AccessibilityControllerModule(
             promise.reject("ERR_SETTINGS_OPEN", "Failed to open accessibility settings", e)
         }
     }
+
+    /**
+     * Returns true if the SYSTEM_ALERT_WINDOW ("Draw over other apps") permission
+     * has been granted. Always returns true on API < 23.
+     */
+    @ReactMethod
+    fun canDrawOverlays(promise: Promise) {
+        try {
+            promise.resolve(OverlayManager.canDrawOverlays(reactApplicationContext))
+        } catch (e: Exception) {
+            promise.reject("ERR_OVERLAY_CHECK", "Failed to check overlay permission", e)
+        }
+    }
 }
