@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "A11y Controller Demo",
+    "slug": "react-native-accessibility-controller-example",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "android": {
+      "package": "tech.bedda.a11ycontrollerexample",
+      "permissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW"
+      ]
+    },
+    "ios": {
+      "supportsTablet": false
+    }
+  }
+}
