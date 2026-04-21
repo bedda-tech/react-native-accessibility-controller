@@ -79,7 +79,7 @@ class AccessibilityControllerService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         event ?: return
         val context = reactContextRef?.get() ?: return
-        if (!context.hasActiveCatalystInstance()) return
+        if (!context.hasActiveReactInstance()) return
 
         emitA11yEvent(context, event)
 

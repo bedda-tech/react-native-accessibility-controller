@@ -30,6 +30,13 @@ android {
     kotlinOptions {
         jvmTarget = '11'
     }
+
+    lint {
+        abortOnError true
+        warningsAsErrors false
+        // react-android:+ is intentional — version is supplied by the consuming app
+        disable 'GradleDependency'
+    }
 }
 
 repositories {

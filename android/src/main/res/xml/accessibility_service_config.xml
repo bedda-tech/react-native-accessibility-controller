@@ -17,5 +17,4 @@
     android:canRetrieveWindowContent="true"
     android:canTakeScreenshot="true"
     android:notificationTimeout="100"
-    android:settingsActivity="com.beddatech.accessibilitycontroller.SettingsActivity"
     android:description="@string/accessibility_service_description" />
