@@ -8,6 +8,7 @@ export type {
   A11yEvent,
   WindowInfo,
   Subscription,
+  FindNodeQuery,
 } from './types';
 
 import type {
@@ -20,6 +21,7 @@ import type {
   A11yEvent,
   WindowInfo,
   Subscription,
+  FindNodeQuery,
 } from './types';
 
 import { NativeEventEmitter, Platform } from 'react-native';
@@ -45,6 +47,45 @@ export async function getAccessibilityTree(): Promise<AccessibilityNode[]> {
   return NativeAccessibilityController.getAccessibilityTree() as Promise<
     AccessibilityNode[]
   >;
+}
+
+/**
+ * Search the current accessibility tree for the first node matching the query.
+ *
+ * String fields use substring matching (case-sensitive). Returns null when no
+ * node matches.
+ *
+ * @example
+ * const node = await findNode({ text: 'Submit' })
+ * if (node) await tapNode(node.nodeId)
+ */
+export async function findNode(
+  query: FindNodeQuery,
+): Promise<AccessibilityNode | null> {
+  const tree = await getAccessibilityTree();
+  return findInTree(tree, query);
+}
+
+function findInTree(
+  nodes: AccessibilityNode[],
+  query: FindNodeQuery,
+): AccessibilityNode | null {
+  for (const node of nodes) {
+    const textMatch =
+      query.text !== undefined &&
+      node.text !== null &&
+      node.text.includes(query.text);
+    const descMatch =
+      query.contentDescription !== undefined &&
+      node.contentDescription !== null &&
+      node.contentDescription.includes(query.contentDescription);
+    const classMatch =
+      query.className !== undefined && node.className === query.className;
+    if (textMatch || descMatch || classMatch) return node;
+    const found = findInTree(node.children, query);
+    if (found) return found;
+  }
+  return null;
 }
 
 /**

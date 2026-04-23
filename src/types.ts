@@ -100,3 +100,16 @@ export interface WindowInfo {
 export interface Subscription {
   remove(): void;
 }
+
+/**
+ * Query object for findNode(). At least one field must be set.
+ * String comparisons use substring matching (case-sensitive).
+ */
+export interface FindNodeQuery {
+  /** Match nodes whose text contains this substring. */
+  text?: string;
+  /** Match nodes whose contentDescription contains this substring. */
+  contentDescription?: string;
+  /** Match nodes whose className equals this string (exact match). */
+  className?: string;
+}
