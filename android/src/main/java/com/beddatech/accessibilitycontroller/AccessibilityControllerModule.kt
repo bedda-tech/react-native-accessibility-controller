@@ -4,6 +4,7 @@ import android.accessibilityservice.AccessibilityService
 import android.annotation.SuppressLint
 import android.content.ComponentName
 import android.content.Intent
+import android.net.Uri
 import android.graphics.Bitmap
 import android.os.Build
 import android.provider.Settings
@@ -406,6 +407,28 @@ class AccessibilityControllerModule(
             promise.resolve(OverlayManager.canDrawOverlays(reactApplicationContext))
         } catch (e: Exception) {
             promise.reject("ERR_OVERLAY_CHECK", "Failed to check overlay permission", e)
+        }
+    }
+
+    /**
+     * Opens the system "Draw over other apps" settings page for this package.
+     * The user must manually toggle the permission. Call canDrawOverlays() after
+     * the user returns to verify the grant. No-op below API 23 (always granted).
+     */
+    @ReactMethod
+    fun requestOverlayPermission(promise: Promise) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val intent = Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:${reactApplicationContext.packageName}")
+                )
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                reactApplicationContext.startActivity(intent)
+            }
+            promise.resolve(null)
+        } catch (e: Exception) {
+            promise.reject("ERR_OVERLAY_PERMISSION", "Failed to open overlay permission settings", e)
         }
     }
 }

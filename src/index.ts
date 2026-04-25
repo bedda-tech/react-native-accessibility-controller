@@ -315,6 +315,16 @@ export async function canDrawOverlays(): Promise<boolean> {
   return NativeAccessibilityController.canDrawOverlays();
 }
 
+/**
+ * Opens the system "Draw over other apps" settings page for this package.
+ * Call canDrawOverlays() after the user returns to verify the grant.
+ * No-op on non-Android platforms (always permitted).
+ */
+export async function requestOverlayPermission(): Promise<void> {
+  if (Platform.OS !== 'android') return;
+  return NativeAccessibilityController.requestOverlayPermission();
+}
+
 // ---------------------------------------------------------------------------
 // React hooks
 // ---------------------------------------------------------------------------
