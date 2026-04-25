@@ -323,10 +323,12 @@ export type {
   UseAccessibilityTreeOptions,
   UseAccessibilityTreeResult,
   UseAccessibilityEventsOptions,
+  ServiceStatus,
 } from './hooks';
 
 export {
   useAccessibilityTree,
   useAccessibilityEvents,
   useWindowChange,
+  useServiceStatus,
 } from './hooks';

@@ -145,6 +145,85 @@ export function useAccessibilityEvents(
 }
 
 // ---------------------------------------------------------------------------
+// useServiceStatus
+// ---------------------------------------------------------------------------
+
+export interface ServiceStatus {
+  /** True when the AccessibilityService is running. */
+  isEnabled: boolean;
+  /** True when the SYSTEM_ALERT_WINDOW ("Draw over other apps") permission is granted. */
+  canDrawOverlays: boolean;
+  /** True while the initial status check is in progress. */
+  loading: boolean;
+  error: Error | null;
+  /** Manually re-check both permissions immediately. */
+  refresh: () => void;
+}
+
+/**
+ * Reactively tracks whether the AccessibilityService is enabled and whether
+ * the app has the overlay permission.
+ *
+ * ```tsx
+ * const { isEnabled, canDrawOverlays, loading } = useServiceStatus({ pollIntervalMs: 2000 });
+ * if (!isEnabled) return <PermissionBanner />;
+ * ```
+ */
+export function useServiceStatus(
+  options: { pollIntervalMs?: number } = {},
+): ServiceStatus {
+  const { pollIntervalMs } = options;
+
+  const [isEnabled, setIsEnabled] = useState(false);
+  const [canDraw, setCanDraw] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+  const isMounted = useRef(true);
+
+  const check = useCallback(async () => {
+    if (!isMounted.current) return;
+    setError(null);
+    try {
+      const [enabled, overlay] = await Promise.all([
+        NativeAccessibilityController.isServiceEnabled() as Promise<boolean>,
+        Platform.OS === 'android'
+          ? (NativeAccessibilityController.canDrawOverlays() as Promise<boolean>)
+          : Promise.resolve(true),
+      ]);
+      if (isMounted.current) {
+        setIsEnabled(enabled);
+        setCanDraw(overlay);
+      }
+    } catch (e) {
+      if (isMounted.current) {
+        setError(e instanceof Error ? e : new Error(String(e)));
+      }
+    } finally {
+      if (isMounted.current) setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    isMounted.current = true;
+    check();
+
+    if (pollIntervalMs != null && pollIntervalMs > 0) {
+      const id = setInterval(check, pollIntervalMs);
+      return () => {
+        isMounted.current = false;
+        clearInterval(id);
+      };
+    }
+
+    return () => {
+      isMounted.current = false;
+    };
+  }, [check, pollIntervalMs]);
+
+  return { isEnabled, canDrawOverlays: canDraw, loading, error, refresh: check };
+}
+
+// ---------------------------------------------------------------------------
 // useWindowChange
 // ---------------------------------------------------------------------------
 
