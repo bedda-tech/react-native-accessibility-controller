@@ -1,4 +1,4 @@
-import { findNode } from '../src/index';
+import { findNode, findAllNodes } from '../src/index';
 import type { AccessibilityNode, FindNodeQuery } from '../src/types';
 
 // ---------------------------------------------------------------------------
@@ -201,5 +201,69 @@ describe('findNode', () => {
 
       expect(result?.nodeId).toBe('txt');
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// findAllNodes
+// ---------------------------------------------------------------------------
+
+describe('findAllNodes', () => {
+  let mockController: { getAccessibilityTree: jest.Mock };
+
+  beforeEach(() => {
+    mockController = require('../src/NativeAccessibilityController').default;
+    mockController.getAccessibilityTree.mockReset();
+  });
+
+  it('returns all nodes whose text contains the query string', async () => {
+    const a = makeNode({ nodeId: 'a', text: 'Settings' });
+    const b = makeNode({ nodeId: 'b', text: 'Not matching' });
+    const c = makeNode({ nodeId: 'c', text: 'Advanced Settings' });
+    mockController.getAccessibilityTree.mockResolvedValue([a, b, c]);
+
+    const results = await findAllNodes({ text: 'Settings' });
+
+    expect(results.map(n => n.nodeId)).toEqual(['a', 'c']);
+  });
+
+  it('returns an empty array when nothing matches', async () => {
+    const node = makeNode({ nodeId: 'n1', text: 'Home' });
+    mockController.getAccessibilityTree.mockResolvedValue([node]);
+
+    const results = await findAllNodes({ text: 'Settings' });
+
+    expect(results).toEqual([]);
+  });
+
+  it('returns all matching nodes across a nested tree', async () => {
+    const btn1 = makeNode({ nodeId: 'btn1', className: 'android.widget.Button' });
+    const btn2 = makeNode({ nodeId: 'btn2', className: 'android.widget.Button' });
+    const container = makeNode({ nodeId: 'c1', children: [btn1] });
+    const root = makeNode({ nodeId: 'root', children: [container, btn2] });
+    mockController.getAccessibilityTree.mockResolvedValue([root]);
+
+    const results = await findAllNodes({ className: 'android.widget.Button' });
+
+    expect(results.map(n => n.nodeId)).toEqual(['btn1', 'btn2']);
+  });
+
+  it('returns an empty array on an empty tree', async () => {
+    mockController.getAccessibilityTree.mockResolvedValue([]);
+
+    const results = await findAllNodes({ text: 'anything' });
+
+    expect(results).toEqual([]);
+  });
+
+  it('returns all matches when using contentDescription', async () => {
+    const a = makeNode({ nodeId: 'a', contentDescription: 'Close button' });
+    const b = makeNode({ nodeId: 'b', contentDescription: 'Back button' });
+    const c = makeNode({ nodeId: 'c', contentDescription: 'Menu button' });
+    mockController.getAccessibilityTree.mockResolvedValue([a, b, c]);
+
+    const results = await findAllNodes({ contentDescription: 'button' });
+
+    expect(results.map(n => n.nodeId)).toEqual(['a', 'b', 'c']);
   });
 });

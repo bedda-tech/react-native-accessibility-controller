@@ -66,26 +66,61 @@ export async function findNode(
   return findInTree(tree, query);
 }
 
+/**
+ * Search the current accessibility tree for ALL nodes matching the query.
+ *
+ * String fields use substring matching (case-sensitive). Returns an empty
+ * array when no nodes match.
+ *
+ * @example
+ * const buttons = await findAllNodes({ className: 'android.widget.Button' })
+ * // Tap each one in turn
+ * for (const btn of buttons) await tapNode(btn.nodeId)
+ */
+export async function findAllNodes(
+  query: FindNodeQuery,
+): Promise<AccessibilityNode[]> {
+  const tree = await getAccessibilityTree();
+  const results: AccessibilityNode[] = [];
+  collectFromTree(tree, query, results);
+  return results;
+}
+
+function nodeMatches(node: AccessibilityNode, query: FindNodeQuery): boolean {
+  const textMatch =
+    query.text !== undefined &&
+    node.text !== null &&
+    node.text.includes(query.text);
+  const descMatch =
+    query.contentDescription !== undefined &&
+    node.contentDescription !== null &&
+    node.contentDescription.includes(query.contentDescription);
+  const classMatch =
+    query.className !== undefined && node.className === query.className;
+  return textMatch || descMatch || classMatch;
+}
+
 function findInTree(
   nodes: AccessibilityNode[],
   query: FindNodeQuery,
 ): AccessibilityNode | null {
   for (const node of nodes) {
-    const textMatch =
-      query.text !== undefined &&
-      node.text !== null &&
-      node.text.includes(query.text);
-    const descMatch =
-      query.contentDescription !== undefined &&
-      node.contentDescription !== null &&
-      node.contentDescription.includes(query.contentDescription);
-    const classMatch =
-      query.className !== undefined && node.className === query.className;
-    if (textMatch || descMatch || classMatch) return node;
+    if (nodeMatches(node, query)) return node;
     const found = findInTree(node.children, query);
     if (found) return found;
   }
   return null;
+}
+
+function collectFromTree(
+  nodes: AccessibilityNode[],
+  query: FindNodeQuery,
+  results: AccessibilityNode[],
+): void {
+  for (const node of nodes) {
+    if (nodeMatches(node, query)) results.push(node);
+    collectFromTree(node.children, query, results);
+  }
 }
 
 /**
