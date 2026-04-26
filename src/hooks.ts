@@ -224,6 +224,87 @@ export function useServiceStatus(
 }
 
 // ---------------------------------------------------------------------------
+// useScreenText
+// ---------------------------------------------------------------------------
+
+export interface UseScreenTextOptions {
+  /**
+   * Automatically poll the serialised screen text every `pollIntervalMs` ms.
+   * Pass `undefined` (default) to disable automatic polling.
+   */
+  pollIntervalMs?: number;
+  /**
+   * Fetch immediately on mount (default: true).
+   */
+  fetchOnMount?: boolean;
+}
+
+export interface UseScreenTextResult {
+  text: string | null;
+  loading: boolean;
+  error: Error | null;
+  /** Manually trigger a fresh fetch. */
+  refresh: () => void;
+}
+
+/**
+ * Fetches and optionally polls the serialised text representation of the
+ * current screen. Useful for showing a live preview of what the agent sees.
+ *
+ * ```tsx
+ * const { text, loading } = useScreenText({ pollIntervalMs: 2000 });
+ * ```
+ */
+export function useScreenText(
+  options: UseScreenTextOptions = {},
+): UseScreenTextResult {
+  const { pollIntervalMs, fetchOnMount = true } = options;
+
+  const [text, setText] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<Error | null>(null);
+  const isMounted = useRef(true);
+
+  const fetchText = useCallback(async () => {
+    if (!isMounted.current) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await NativeAccessibilityController.getScreenText() as string;
+      if (isMounted.current) setText(result);
+    } catch (e) {
+      if (isMounted.current) {
+        setError(e instanceof Error ? e : new Error(String(e)));
+      }
+    } finally {
+      if (isMounted.current) setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    isMounted.current = true;
+
+    if (fetchOnMount) {
+      fetchText();
+    }
+
+    if (pollIntervalMs != null && pollIntervalMs > 0) {
+      const id = setInterval(fetchText, pollIntervalMs);
+      return () => {
+        isMounted.current = false;
+        clearInterval(id);
+      };
+    }
+
+    return () => {
+      isMounted.current = false;
+    };
+  }, [fetchOnMount, fetchText, pollIntervalMs]);
+
+  return { text, loading, error, refresh: fetchText };
+}
+
+// ---------------------------------------------------------------------------
 // useWindowChange
 // ---------------------------------------------------------------------------
 

@@ -332,12 +332,15 @@ export async function requestOverlayPermission(): Promise<void> {
 export type {
   UseAccessibilityTreeOptions,
   UseAccessibilityTreeResult,
+  UseScreenTextOptions,
+  UseScreenTextResult,
   UseAccessibilityEventsOptions,
   ServiceStatus,
 } from './hooks';
 
 export {
   useAccessibilityTree,
+  useScreenText,
   useAccessibilityEvents,
   useWindowChange,
   useServiceStatus,
