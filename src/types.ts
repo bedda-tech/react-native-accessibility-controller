@@ -25,7 +25,9 @@ export type NodeAction =
   | 'scrollBackward'
   | 'setText'
   | 'clearFocus'
-  | 'select';
+  | 'select'
+  | 'clearText'
+  | 'imeEnter';
 
 /**
  * System-level global actions.

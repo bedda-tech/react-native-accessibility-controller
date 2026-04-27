@@ -1,5 +1,6 @@
 package com.beddatech.accessibilitycontroller
 
+import android.os.Build
 import android.os.Bundle
 import android.view.accessibility.AccessibilityNodeInfo
 
@@ -24,6 +25,17 @@ object ActionDispatcher {
      * For "setText" prefer [setNodeText] which accepts the text argument.
      */
     fun performAction(nodeId: String, action: String): Boolean {
+        if (action == "imeEnter") {
+            return executeOnNode(nodeId) { node ->
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    @Suppress("NewApi")
+                    node.performAction(AccessibilityNodeInfo.ACTION_IME_ENTER)
+                } else {
+                    // Pre-API-30 fallback: click the node (submits most form fields).
+                    node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                }
+            }
+        }
         val androidActionId = jsActionToAndroid(action) ?: return false
         return executeOnNode(nodeId) { node ->
             node.performAction(androidActionId)
@@ -167,6 +179,7 @@ object ActionDispatcher {
         "scrollBackward" -> AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD
         "clearFocus"     -> AccessibilityNodeInfo.ACTION_CLEAR_FOCUS
         "select"         -> AccessibilityNodeInfo.ACTION_SELECT
+        "clearText"      -> AccessibilityNodeInfo.ACTION_CLEAR_TEXT
         else             -> null
     }
 }
