@@ -1,4 +1,5 @@
-import { getScreenText } from '../src/index';
+import { getInstalledApps } from '../src/index';
+import type { InstalledApp } from '../src/types';
 
 // ---------------------------------------------------------------------------
 // Mock react-native
@@ -43,38 +44,54 @@ jest.mock('../src/NativeAccessibilityController', () => ({
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const mockController = require('../src/NativeAccessibilityController').default as {
-  getScreenText: jest.Mock<Promise<string>>;
+  getInstalledApps: jest.Mock<Promise<InstalledApp[]>>;
 };
 
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('getScreenText', () => {
+describe('getInstalledApps', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  it('returns the serialised screen text from the native module', async () => {
-    mockController.getScreenText.mockResolvedValue('Button: Submit\nText: Hello world');
+  it('returns the list of installed apps from the native module', async () => {
+    const apps: InstalledApp[] = [
+      { packageName: 'com.android.settings', label: 'Settings' },
+      { packageName: 'com.google.android.apps.maps', label: 'Maps' },
+    ];
+    mockController.getInstalledApps.mockResolvedValue(apps);
 
-    const result = await getScreenText();
+    const result = await getInstalledApps();
 
-    expect(mockController.getScreenText).toHaveBeenCalledTimes(1);
-    expect(result).toBe('Button: Submit\nText: Hello world');
+    expect(mockController.getInstalledApps).toHaveBeenCalledTimes(1);
+    expect(result).toEqual(apps);
   });
 
-  it('returns an empty string when the screen has no elements', async () => {
-    mockController.getScreenText.mockResolvedValue('');
+  it('returns an empty array when no launchable apps are found', async () => {
+    mockController.getInstalledApps.mockResolvedValue([]);
 
-    const result = await getScreenText();
+    const result = await getInstalledApps();
 
-    expect(result).toBe('');
+    expect(result).toEqual([]);
+  });
+
+  it('each app has packageName and label strings', async () => {
+    mockController.getInstalledApps.mockResolvedValue([
+      { packageName: 'com.example.app', label: 'My App' },
+    ]);
+
+    const [app] = await getInstalledApps();
+    expect(typeof app.packageName).toBe('string');
+    expect(typeof app.label).toBe('string');
   });
 
   it('propagates errors thrown by the native module', async () => {
-    mockController.getScreenText.mockRejectedValue(new Error('Service not enabled'));
+    mockController.getInstalledApps.mockRejectedValue(
+      new Error('ERR_GET_INSTALLED_APPS'),
+    );
 
-    await expect(getScreenText()).rejects.toThrow('Service not enabled');
+    await expect(getInstalledApps()).rejects.toThrow('ERR_GET_INSTALLED_APPS');
   });
 });

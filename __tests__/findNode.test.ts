@@ -30,6 +30,7 @@ jest.mock('../src/NativeAccessibilityController', () => ({
     swipe: jest.fn(),
     globalAction: jest.fn(),
     openApp: jest.fn(),
+    getInstalledApps: jest.fn(),
     showOverlay: jest.fn(),
     updateOverlay: jest.fn(),
     hideOverlay: jest.fn(),
