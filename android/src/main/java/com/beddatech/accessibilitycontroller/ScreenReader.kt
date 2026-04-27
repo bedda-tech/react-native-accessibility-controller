@@ -107,6 +107,8 @@ object ScreenReader {
         map.putBoolean("isScrollable", node.isScrollable)
         map.putBoolean("isEditable", node.isEditable)
         map.putBoolean("isFocused", node.isFocused)
+        map.putBoolean("isChecked", node.isChecked)
+        map.putBoolean("isEnabled", node.isEnabled)
 
         // Available actions (mapped to the JS NodeAction string literals)
         val actions = Arguments.createArray()
@@ -162,6 +164,8 @@ object ScreenReader {
                 if (node.isScrollable) add("scrollable")
                 if (node.isEditable) add("editable")
                 if (node.isFocused) add("focused")
+                if (node.isChecked) add("checked")
+                if (!node.isEnabled) add("disabled")
             }
             if (flags.isNotEmpty()) sb.append(" (${flags.joinToString(", ")})")
             sb.append(" [${rect.left},${rect.top}-${rect.right},${rect.bottom}]")
