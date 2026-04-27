@@ -102,6 +102,16 @@ export interface Subscription {
 }
 
 /**
+ * A single installed app returned by getInstalledApps().
+ */
+export interface InstalledApp {
+  /** Android package name, e.g. "com.android.settings". */
+  packageName: string;
+  /** Human-readable app label, e.g. "Settings". */
+  label: string;
+}
+
+/**
  * Query object for findNode(). At least one field must be set.
  * String comparisons use substring matching (case-sensitive).
  */

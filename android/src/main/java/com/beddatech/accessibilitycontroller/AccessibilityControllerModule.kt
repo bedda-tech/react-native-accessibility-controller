@@ -316,6 +316,27 @@ class AccessibilityControllerModule(
         }
     }
 
+    @ReactMethod
+    fun getInstalledApps(promise: Promise) {
+        try {
+            val pm = reactApplicationContext.packageManager
+            val mainIntent = Intent(Intent.ACTION_MAIN).apply {
+                addCategory(Intent.CATEGORY_LAUNCHER)
+            }
+            val activities = pm.queryIntentActivities(mainIntent, 0)
+            val result = Arguments.createArray()
+            for (info in activities) {
+                val map = Arguments.createMap()
+                map.putString("packageName", info.activityInfo.packageName)
+                map.putString("label", info.loadLabel(pm).toString())
+                result.pushMap(map)
+            }
+            promise.resolve(result)
+        } catch (e: Exception) {
+            promise.reject("ERR_GET_INSTALLED_APPS", "getInstalledApps failed", e)
+        }
+    }
+
     // -----------------------------------------------------------------------
     // Overlay
     // -----------------------------------------------------------------------

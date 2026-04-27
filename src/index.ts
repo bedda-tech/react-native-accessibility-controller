@@ -9,6 +9,7 @@ export type {
   WindowInfo,
   Subscription,
   FindNodeQuery,
+  InstalledApp,
 } from './types';
 
 import type {
@@ -22,6 +23,7 @@ import type {
   WindowInfo,
   Subscription,
   FindNodeQuery,
+  InstalledApp,
 } from './types';
 
 import { NativeEventEmitter, Platform } from 'react-native';
@@ -238,6 +240,14 @@ export async function globalAction(action: GlobalAction): Promise<boolean> {
  */
 export async function openApp(packageName: string): Promise<boolean> {
   return NativeAccessibilityController.openApp(packageName);
+}
+
+/**
+ * Returns a list of all user-launchable apps installed on the device.
+ * Each entry includes the Android package name and the human-readable label.
+ */
+export async function getInstalledApps(): Promise<InstalledApp[]> {
+  return NativeAccessibilityController.getInstalledApps() as Promise<InstalledApp[]>;
 }
 
 // ---------------------------------------------------------------------------

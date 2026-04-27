@@ -38,6 +38,7 @@ export interface Spec extends TurboModule {
   // Global actions
   globalAction(action: string): Promise<boolean>;
   openApp(packageName: string): Promise<boolean>;
+  getInstalledApps(): Promise<Object[]>;
 
   // Overlay
   showOverlay(config: Object): Promise<void>;
