@@ -1,0 +1,275 @@
+import {
+  performAction,
+  tapNode,
+  longPressNode,
+  setNodeText,
+  scrollNode,
+  tap,
+  longPress,
+  swipe,
+  globalAction,
+  openApp,
+  isServiceEnabled,
+  canDrawOverlays,
+  onAccessibilityEvent,
+  onWindowChange,
+  onOverlayStop,
+} from '../src/index';
+
+// ---------------------------------------------------------------------------
+// Mock react-native
+// ---------------------------------------------------------------------------
+
+const mockAddListener = jest.fn();
+
+jest.mock('react-native', () => ({
+  NativeEventEmitter: jest.fn(() => ({ addListener: mockAddListener })),
+  Platform: { OS: 'android' },
+}));
+
+// ---------------------------------------------------------------------------
+// Mock the native TurboModule
+// ---------------------------------------------------------------------------
+
+jest.mock('../src/NativeAccessibilityController', () => ({
+  __esModule: true,
+  default: {
+    getAccessibilityTree: jest.fn(),
+    getScreenText: jest.fn(),
+    takeScreenshot: jest.fn(),
+    performAction: jest.fn(),
+    tapNode: jest.fn(),
+    longPressNode: jest.fn(),
+    setNodeText: jest.fn(),
+    scrollNode: jest.fn(),
+    tap: jest.fn(),
+    longPress: jest.fn(),
+    swipe: jest.fn(),
+    globalAction: jest.fn(),
+    openApp: jest.fn(),
+    getInstalledApps: jest.fn(),
+    showOverlay: jest.fn(),
+    updateOverlay: jest.fn(),
+    hideOverlay: jest.fn(),
+    isServiceEnabled: jest.fn(),
+    requestServiceEnable: jest.fn(),
+    canDrawOverlays: jest.fn(),
+    requestOverlayPermission: jest.fn(),
+    addListener: jest.fn(),
+    removeListeners: jest.fn(),
+  },
+}));
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const native = require('../src/NativeAccessibilityController').default as Record<string, jest.Mock>;
+
+beforeEach(() => {
+  jest.clearAllMocks();
+});
+
+// ---------------------------------------------------------------------------
+// performAction — includes the new clearText and imeEnter action types
+// ---------------------------------------------------------------------------
+
+describe('performAction', () => {
+  it('delegates clearText action to native', async () => {
+    native.performAction.mockResolvedValue(true);
+    const result = await performAction('node-1', 'clearText');
+    expect(native.performAction).toHaveBeenCalledWith('node-1', 'clearText');
+    expect(result).toBe(true);
+  });
+
+  it('delegates imeEnter action to native', async () => {
+    native.performAction.mockResolvedValue(true);
+    const result = await performAction('node-1', 'imeEnter');
+    expect(native.performAction).toHaveBeenCalledWith('node-1', 'imeEnter');
+    expect(result).toBe(true);
+  });
+
+  it('propagates false result from native', async () => {
+    native.performAction.mockResolvedValue(false);
+    const result = await performAction('node-42', 'click');
+    expect(result).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Node action convenience wrappers
+// ---------------------------------------------------------------------------
+
+describe('tapNode', () => {
+  it('calls native tapNode with nodeId', async () => {
+    native.tapNode.mockResolvedValue(true);
+    await tapNode('btn-1');
+    expect(native.tapNode).toHaveBeenCalledWith('btn-1');
+  });
+});
+
+describe('longPressNode', () => {
+  it('calls native longPressNode with nodeId', async () => {
+    native.longPressNode.mockResolvedValue(true);
+    await longPressNode('btn-2');
+    expect(native.longPressNode).toHaveBeenCalledWith('btn-2');
+  });
+});
+
+describe('setNodeText', () => {
+  it('calls native setNodeText with nodeId and text', async () => {
+    native.setNodeText.mockResolvedValue(true);
+    await setNodeText('input-1', 'hello world');
+    expect(native.setNodeText).toHaveBeenCalledWith('input-1', 'hello world');
+  });
+});
+
+describe('scrollNode', () => {
+  it('calls native scrollNode with nodeId and direction', async () => {
+    native.scrollNode.mockResolvedValue(true);
+    await scrollNode('list-1', 'down');
+    expect(native.scrollNode).toHaveBeenCalledWith('list-1', 'down');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Coordinate-based gestures
+// ---------------------------------------------------------------------------
+
+describe('tap', () => {
+  it('calls native tap with x and y coordinates', async () => {
+    native.tap.mockResolvedValue(true);
+    await tap(100, 200);
+    expect(native.tap).toHaveBeenCalledWith(100, 200);
+  });
+});
+
+describe('longPress', () => {
+  it('calls native longPress with x and y coordinates', async () => {
+    native.longPress.mockResolvedValue(true);
+    await longPress(50, 75);
+    expect(native.longPress).toHaveBeenCalledWith(50, 75);
+  });
+});
+
+describe('swipe', () => {
+  it('uses default durationMs of 300 when not specified', async () => {
+    native.swipe.mockResolvedValue(true);
+    await swipe(0, 500, 0, 100);
+    expect(native.swipe).toHaveBeenCalledWith(0, 500, 0, 100, 300);
+  });
+
+  it('passes explicit durationMs through to native', async () => {
+    native.swipe.mockResolvedValue(true);
+    await swipe(0, 500, 0, 100, 600);
+    expect(native.swipe).toHaveBeenCalledWith(0, 500, 0, 100, 600);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Global actions
+// ---------------------------------------------------------------------------
+
+describe('globalAction', () => {
+  it('delegates home action to native', async () => {
+    native.globalAction.mockResolvedValue(true);
+    await globalAction('home');
+    expect(native.globalAction).toHaveBeenCalledWith('home');
+  });
+
+  it('delegates back action to native', async () => {
+    native.globalAction.mockResolvedValue(true);
+    await globalAction('back');
+    expect(native.globalAction).toHaveBeenCalledWith('back');
+  });
+});
+
+describe('openApp', () => {
+  it('calls native openApp with package name', async () => {
+    native.openApp.mockResolvedValue(true);
+    await openApp('com.android.settings');
+    expect(native.openApp).toHaveBeenCalledWith('com.android.settings');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Service lifecycle
+// ---------------------------------------------------------------------------
+
+describe('isServiceEnabled', () => {
+  it('returns true when native reports enabled', async () => {
+    native.isServiceEnabled.mockResolvedValue(true);
+    const result = await isServiceEnabled();
+    expect(result).toBe(true);
+  });
+
+  it('returns false when native reports disabled', async () => {
+    native.isServiceEnabled.mockResolvedValue(false);
+    const result = await isServiceEnabled();
+    expect(result).toBe(false);
+  });
+});
+
+describe('canDrawOverlays', () => {
+  it('delegates to native on Android', async () => {
+    native.canDrawOverlays.mockResolvedValue(true);
+    const result = await canDrawOverlays();
+    expect(native.canDrawOverlays).toHaveBeenCalledTimes(1);
+    expect(result).toBe(true);
+  });
+
+  it('returns false when overlay permission is not granted', async () => {
+    native.canDrawOverlays.mockResolvedValue(false);
+    const result = await canDrawOverlays();
+    expect(result).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Event subscriptions (Android path — emitter is non-null)
+// ---------------------------------------------------------------------------
+
+describe('onAccessibilityEvent', () => {
+  it('calls emitter.addListener with onAccessibilityEvent', () => {
+    const mockRemove = jest.fn();
+    mockAddListener.mockReturnValue({ remove: mockRemove });
+
+    const callback = jest.fn();
+    const sub = onAccessibilityEvent(callback);
+
+    expect(mockAddListener).toHaveBeenCalledWith('onAccessibilityEvent', callback);
+    expect(sub).toHaveProperty('remove');
+  });
+
+  it('returned subscription remove() calls underlying remove', () => {
+    const mockRemove = jest.fn();
+    mockAddListener.mockReturnValue({ remove: mockRemove });
+
+    const sub = onAccessibilityEvent(jest.fn());
+    sub.remove();
+
+    expect(mockRemove).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('onWindowChange', () => {
+  it('calls emitter.addListener with onWindowChange', () => {
+    const mockRemove = jest.fn();
+    mockAddListener.mockReturnValue({ remove: mockRemove });
+
+    const callback = jest.fn();
+    const sub = onWindowChange(callback);
+
+    expect(mockAddListener).toHaveBeenCalledWith('onWindowChange', callback);
+    expect(sub).toHaveProperty('remove');
+  });
+});
+
+describe('onOverlayStop', () => {
+  it('calls emitter.addListener with onOverlayStop', () => {
+    const mockRemove = jest.fn();
+    mockAddListener.mockReturnValue({ remove: mockRemove });
+
+    const sub = onOverlayStop(jest.fn());
+
+    expect(mockAddListener).toHaveBeenCalledWith('onOverlayStop', expect.any(Function));
+    expect(sub).toHaveProperty('remove');
+  });
+});
