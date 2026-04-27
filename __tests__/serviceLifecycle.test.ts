@@ -20,10 +20,8 @@ import {
 // Mock react-native
 // ---------------------------------------------------------------------------
 
-const mockAddListener = jest.fn();
-
 jest.mock('react-native', () => ({
-  NativeEventEmitter: jest.fn(() => ({ addListener: mockAddListener })),
+  NativeEventEmitter: jest.fn(() => ({ addListener: jest.fn() })),
   Platform: { OS: 'android' },
 }));
 
@@ -62,6 +60,14 @@ jest.mock('../src/NativeAccessibilityController', () => ({
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const native = require('../src/NativeAccessibilityController').default as Record<string, jest.Mock>;
+
+// Capture the addListener mock from the emitter created when src/index.ts loaded.
+// Must be captured in beforeAll before clearAllMocks() wipes NativeEventEmitter.mock.results.
+let addListenerMock: jest.Mock;
+beforeAll(() => {
+  const MockNE = jest.requireMock('react-native').NativeEventEmitter as jest.Mock;
+  addListenerMock = MockNE.mock.results[0].value.addListener;
+});
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -229,18 +235,18 @@ describe('canDrawOverlays', () => {
 describe('onAccessibilityEvent', () => {
   it('calls emitter.addListener with onAccessibilityEvent', () => {
     const mockRemove = jest.fn();
-    mockAddListener.mockReturnValue({ remove: mockRemove });
+    addListenerMock.mockReturnValue({ remove: mockRemove });
 
     const callback = jest.fn();
     const sub = onAccessibilityEvent(callback);
 
-    expect(mockAddListener).toHaveBeenCalledWith('onAccessibilityEvent', callback);
+    expect(addListenerMock).toHaveBeenCalledWith('onAccessibilityEvent', callback);
     expect(sub).toHaveProperty('remove');
   });
 
   it('returned subscription remove() calls underlying remove', () => {
     const mockRemove = jest.fn();
-    mockAddListener.mockReturnValue({ remove: mockRemove });
+    addListenerMock.mockReturnValue({ remove: mockRemove });
 
     const sub = onAccessibilityEvent(jest.fn());
     sub.remove();
@@ -252,12 +258,12 @@ describe('onAccessibilityEvent', () => {
 describe('onWindowChange', () => {
   it('calls emitter.addListener with onWindowChange', () => {
     const mockRemove = jest.fn();
-    mockAddListener.mockReturnValue({ remove: mockRemove });
+    addListenerMock.mockReturnValue({ remove: mockRemove });
 
     const callback = jest.fn();
     const sub = onWindowChange(callback);
 
-    expect(mockAddListener).toHaveBeenCalledWith('onWindowChange', callback);
+    expect(addListenerMock).toHaveBeenCalledWith('onWindowChange', callback);
     expect(sub).toHaveProperty('remove');
   });
 });
@@ -265,11 +271,11 @@ describe('onWindowChange', () => {
 describe('onOverlayStop', () => {
   it('calls emitter.addListener with onOverlayStop', () => {
     const mockRemove = jest.fn();
-    mockAddListener.mockReturnValue({ remove: mockRemove });
+    addListenerMock.mockReturnValue({ remove: mockRemove });
 
     const sub = onOverlayStop(jest.fn());
 
-    expect(mockAddListener).toHaveBeenCalledWith('onOverlayStop', expect.any(Function));
+    expect(addListenerMock).toHaveBeenCalledWith('onOverlayStop', expect.any(Function));
     expect(sub).toHaveProperty('remove');
   });
 });
