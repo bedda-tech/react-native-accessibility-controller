@@ -11,6 +11,10 @@ import {
   openApp,
   isServiceEnabled,
   canDrawOverlays,
+  takeScreenshot,
+  showOverlay,
+  updateOverlay,
+  hideOverlay,
   onAccessibilityEvent,
   onWindowChange,
   onOverlayStop,
@@ -277,5 +281,87 @@ describe('onOverlayStop', () => {
 
     expect(addListenerMock).toHaveBeenCalledWith('onOverlayStop', expect.any(Function));
     expect(sub).toHaveProperty('remove');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// takeScreenshot
+// ---------------------------------------------------------------------------
+
+describe('takeScreenshot', () => {
+  it('delegates to native takeScreenshot and returns the path', async () => {
+    native.takeScreenshot.mockResolvedValue('/data/local/tmp/screen.png');
+
+    const result = await takeScreenshot();
+
+    expect(native.takeScreenshot).toHaveBeenCalledTimes(1);
+    expect(result).toBe('/data/local/tmp/screen.png');
+  });
+
+  it('propagates rejection from native', async () => {
+    native.takeScreenshot.mockRejectedValue(new Error('capture failed'));
+
+    await expect(takeScreenshot()).rejects.toThrow('capture failed');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// showOverlay
+// ---------------------------------------------------------------------------
+
+describe('showOverlay', () => {
+  it('delegates to native showOverlay with the provided config', async () => {
+    native.showOverlay.mockResolvedValue(undefined);
+
+    await showOverlay({ gravity: 'top-right', action: 'Working…', stepCount: 0 });
+
+    expect(native.showOverlay).toHaveBeenCalledWith({
+      gravity: 'top-right',
+      action: 'Working…',
+      stepCount: 0,
+    });
+  });
+
+  it('propagates rejection from native', async () => {
+    native.showOverlay.mockRejectedValue(new Error('overlay permission denied'));
+
+    await expect(showOverlay({ gravity: 'top-right' })).rejects.toThrow('overlay permission denied');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// updateOverlay
+// ---------------------------------------------------------------------------
+
+describe('updateOverlay', () => {
+  it('delegates to native updateOverlay with action and stepCount', async () => {
+    native.updateOverlay.mockResolvedValue(undefined);
+
+    await updateOverlay({ action: 'Tapping Settings', stepCount: 3 });
+
+    expect(native.updateOverlay).toHaveBeenCalledWith({
+      action: 'Tapping Settings',
+      stepCount: 3,
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// hideOverlay
+// ---------------------------------------------------------------------------
+
+describe('hideOverlay', () => {
+  it('delegates to native hideOverlay', async () => {
+    native.hideOverlay.mockResolvedValue(undefined);
+
+    await hideOverlay();
+
+    expect(native.hideOverlay).toHaveBeenCalledTimes(1);
+  });
+
+  it('propagates rejection from native', async () => {
+    native.hideOverlay.mockRejectedValue(new Error('not shown'));
+
+    await expect(hideOverlay()).rejects.toThrow('not shown');
   });
 });
