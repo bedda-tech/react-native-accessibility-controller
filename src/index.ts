@@ -381,6 +381,7 @@ export type {
   UseScreenTextResult,
   UseAccessibilityEventsOptions,
   ServiceStatus,
+  UseOverlayResult,
 } from './hooks';
 
 export {
@@ -389,4 +390,5 @@ export {
   useAccessibilityEvents,
   useWindowChange,
   useServiceStatus,
+  useOverlay,
 } from './hooks';

@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { NativeEventEmitter, Platform } from 'react-native';
 import NativeAccessibilityController from './NativeAccessibilityController';
-import type { AccessibilityNode, A11yEvent, WindowInfo } from './types';
+import type { AccessibilityNode, A11yEvent, WindowInfo, OverlayConfig, OverlayUpdateConfig } from './types';
 
 // ---------------------------------------------------------------------------
 // Internal emitter (shared with index.ts subscribers)
@@ -328,4 +328,81 @@ export function useWindowChange(): WindowInfo | null {
   }, []);
 
   return win;
+}
+
+// ---------------------------------------------------------------------------
+// useOverlay
+// ---------------------------------------------------------------------------
+
+export interface UseOverlayResult {
+  /** True while the native overlay window is shown. */
+  isVisible: boolean;
+  /** Show the overlay with the given configuration. */
+  show: (config: OverlayConfig) => Promise<void>;
+  /** Update the overlay content (action text and step count). No-op if not visible. */
+  update: (config: OverlayUpdateConfig) => Promise<void>;
+  /** Hide the overlay. */
+  hide: () => Promise<void>;
+}
+
+/**
+ * Manages the native floating agent-status overlay.
+ *
+ * Automatically hides the overlay on unmount. Subscribe to the overlay stop
+ * button via the `onStop` option — called when the user taps the Stop button
+ * in the overlay.
+ *
+ * ```tsx
+ * const overlay = useOverlay({ onStop: () => agent.abort() });
+ *
+ * // Show when agent starts
+ * await overlay.show({ gravity: 'top-right', action: 'Working...', stepCount: 0 });
+ *
+ * // Update on each action
+ * await overlay.update({ action: 'Tapping Settings', stepCount: 3 });
+ *
+ * // Hide when done
+ * await overlay.hide();
+ * ```
+ */
+export function useOverlay(options: { onStop?: () => void } = {}): UseOverlayResult {
+  const { onStop } = options;
+  const [isVisible, setIsVisible] = useState(false);
+  const onStopRef = useRef(onStop);
+  onStopRef.current = onStop;
+
+  // Subscribe to the overlay stop button
+  useEffect(() => {
+    if (!emitter) return;
+    const sub = emitter.addListener('onOverlayStop', () => {
+      setIsVisible(false);
+      onStopRef.current?.();
+    });
+    return () => sub.remove();
+  }, []);
+
+  // Auto-hide on unmount
+  useEffect(() => {
+    return () => {
+      if (Platform.OS === 'android') {
+        NativeAccessibilityController.hideOverlay().catch(() => {});
+      }
+    };
+  }, []);
+
+  const show = useCallback(async (config: OverlayConfig) => {
+    await NativeAccessibilityController.showOverlay(config);
+    setIsVisible(true);
+  }, []);
+
+  const update = useCallback(async (config: OverlayUpdateConfig) => {
+    await NativeAccessibilityController.updateOverlay(config);
+  }, []);
+
+  const hide = useCallback(async () => {
+    await NativeAccessibilityController.hideOverlay();
+    setIsVisible(false);
+  }, []);
+
+  return { isVisible, show, update, hide };
 }
