@@ -62,6 +62,8 @@ function makeNode(partial: Partial<AccessibilityNode> & { nodeId: string }): Acc
     isScrollable: false,
     isEditable: false,
     isFocused: false,
+    isChecked: false,
+    isEnabled: true,
     children: [],
     availableActions: [],
     ...partial,
@@ -203,6 +205,56 @@ describe('findNode', () => {
       expect(result?.nodeId).toBe('txt');
     });
   });
+
+  describe('isChecked and isEnabled filtering', () => {
+    it('returns a checked node when isChecked: true', async () => {
+      const unchecked = makeNode({ nodeId: 'cb-off', text: 'Wi-Fi', isChecked: false });
+      const checked = makeNode({ nodeId: 'cb-on', text: 'Wi-Fi', isChecked: true });
+      mockController.getAccessibilityTree.mockResolvedValue([unchecked, checked]);
+
+      const result = await findNode({ text: 'Wi-Fi', isChecked: true });
+
+      expect(result?.nodeId).toBe('cb-on');
+    });
+
+    it('returns null when isChecked filter excludes all matches', async () => {
+      const node = makeNode({ nodeId: 'cb', text: 'Bluetooth', isChecked: false });
+      mockController.getAccessibilityTree.mockResolvedValue([node]);
+
+      const result = await findNode({ text: 'Bluetooth', isChecked: true });
+
+      expect(result).toBeNull();
+    });
+
+    it('filters disabled nodes with isEnabled: false', async () => {
+      const enabled = makeNode({ nodeId: 'btn-active', text: 'Save', isEnabled: true });
+      const disabled = makeNode({ nodeId: 'btn-inactive', text: 'Save', isEnabled: false });
+      mockController.getAccessibilityTree.mockResolvedValue([enabled, disabled]);
+
+      const result = await findNode({ text: 'Save', isEnabled: false });
+
+      expect(result?.nodeId).toBe('btn-inactive');
+    });
+
+    it('matches by isChecked alone (no string criteria)', async () => {
+      const a = makeNode({ nodeId: 'n1', isChecked: false });
+      const b = makeNode({ nodeId: 'n2', isChecked: true });
+      mockController.getAccessibilityTree.mockResolvedValue([a, b]);
+
+      const result = await findNode({ isChecked: true });
+
+      expect(result?.nodeId).toBe('n2');
+    });
+
+    it('returns null for empty query object', async () => {
+      const node = makeNode({ nodeId: 'n1', text: 'anything' });
+      mockController.getAccessibilityTree.mockResolvedValue([node]);
+
+      const result = await findNode({});
+
+      expect(result).toBeNull();
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -266,5 +318,28 @@ describe('findAllNodes', () => {
     const results = await findAllNodes({ contentDescription: 'button' });
 
     expect(results.map(n => n.nodeId)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('returns only checked checkboxes when querying by className + isChecked', async () => {
+    const cbClass = 'android.widget.CheckBox';
+    const cb1 = makeNode({ nodeId: 'cb1', className: cbClass, isChecked: true });
+    const cb2 = makeNode({ nodeId: 'cb2', className: cbClass, isChecked: false });
+    const cb3 = makeNode({ nodeId: 'cb3', className: cbClass, isChecked: true });
+    mockController.getAccessibilityTree.mockResolvedValue([cb1, cb2, cb3]);
+
+    const results = await findAllNodes({ className: cbClass, isChecked: true });
+
+    expect(results.map(n => n.nodeId)).toEqual(['cb1', 'cb3']);
+  });
+
+  it('returns all enabled nodes by isEnabled alone', async () => {
+    const a = makeNode({ nodeId: 'a', isEnabled: true });
+    const b = makeNode({ nodeId: 'b', isEnabled: false });
+    const c = makeNode({ nodeId: 'c', isEnabled: true });
+    mockController.getAccessibilityTree.mockResolvedValue([a, b, c]);
+
+    const results = await findAllNodes({ isEnabled: true });
+
+    expect(results.map(n => n.nodeId)).toEqual(['a', 'c']);
   });
 });

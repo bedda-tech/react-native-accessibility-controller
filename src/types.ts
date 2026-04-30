@@ -11,6 +11,10 @@ export interface AccessibilityNode {
   isScrollable: boolean;
   isEditable: boolean;
   isFocused: boolean;
+  /** True when the node (checkbox, toggle, radio, etc.) is in a checked/selected state. */
+  isChecked: boolean;
+  /** False when the node is disabled and cannot be interacted with. */
+  isEnabled: boolean;
   children: AccessibilityNode[];
   availableActions: NodeAction[];
 }
@@ -116,6 +120,7 @@ export interface InstalledApp {
 /**
  * Query object for findNode(). At least one field must be set.
  * String comparisons use substring matching (case-sensitive).
+ * Boolean predicates (`isChecked`, `isEnabled`) are AND-ed with any string matches.
  */
 export interface FindNodeQuery {
   /** Match nodes whose text contains this substring. */
@@ -124,4 +129,8 @@ export interface FindNodeQuery {
   contentDescription?: string;
   /** Match nodes whose className equals this string (exact match). */
   className?: string;
+  /** When set, only match nodes whose checked state equals this value. */
+  isChecked?: boolean;
+  /** When set, only match nodes whose enabled state equals this value. */
+  isEnabled?: boolean;
 }

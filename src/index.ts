@@ -89,17 +89,33 @@ export async function findAllNodes(
 }
 
 function nodeMatches(node: AccessibilityNode, query: FindNodeQuery): boolean {
-  const textMatch =
-    query.text !== undefined &&
-    node.text !== null &&
-    node.text.includes(query.text);
-  const descMatch =
-    query.contentDescription !== undefined &&
-    node.contentDescription !== null &&
-    node.contentDescription.includes(query.contentDescription);
-  const classMatch =
-    query.className !== undefined && node.className === query.className;
-  return textMatch || descMatch || classMatch;
+  const hasStringCriteria =
+    query.text !== undefined ||
+    query.contentDescription !== undefined ||
+    query.className !== undefined;
+  const hasBoolCriteria =
+    query.isChecked !== undefined || query.isEnabled !== undefined;
+
+  if (!hasStringCriteria && !hasBoolCriteria) return false;
+
+  if (hasStringCriteria) {
+    const textMatch =
+      query.text !== undefined &&
+      node.text !== null &&
+      node.text.includes(query.text);
+    const descMatch =
+      query.contentDescription !== undefined &&
+      node.contentDescription !== null &&
+      node.contentDescription.includes(query.contentDescription);
+    const classMatch =
+      query.className !== undefined && node.className === query.className;
+    if (!textMatch && !descMatch && !classMatch) return false;
+  }
+
+  if (query.isChecked !== undefined && node.isChecked !== query.isChecked) return false;
+  if (query.isEnabled !== undefined && node.isEnabled !== query.isEnabled) return false;
+
+  return true;
 }
 
 function findInTree(
