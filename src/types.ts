@@ -134,3 +134,13 @@ export interface FindNodeQuery {
   /** When set, only match nodes whose enabled state equals this value. */
   isEnabled?: boolean;
 }
+
+/**
+ * Options for waitForNode().
+ */
+export interface WaitForNodeOptions {
+  /** How long to wait before throwing a timeout error (milliseconds, default: 10000). */
+  timeoutMs?: number;
+  /** How often to re-query the accessibility tree (milliseconds, default: 500). */
+  pollIntervalMs?: number;
+}

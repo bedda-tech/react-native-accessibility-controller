@@ -9,6 +9,7 @@ export type {
   WindowInfo,
   Subscription,
   FindNodeQuery,
+  WaitForNodeOptions,
   InstalledApp,
 } from './types';
 
@@ -23,6 +24,7 @@ import type {
   WindowInfo,
   Subscription,
   FindNodeQuery,
+  WaitForNodeOptions,
   InstalledApp,
 } from './types';
 
