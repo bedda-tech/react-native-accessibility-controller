@@ -90,6 +90,42 @@ export async function findAllNodes(
   return results;
 }
 
+/**
+ * Poll the accessibility tree until a node matching the query appears, then
+ * return it. Throws a `TimeoutError` if the node is not found within
+ * `timeoutMs` milliseconds.
+ *
+ * Useful for waiting after an action triggers an animation or navigation.
+ *
+ * @example
+ * await tapNode(submitButtonId)
+ * const successBanner = await waitForNode({ text: 'Success' }, { timeoutMs: 5000 })
+ * await tapNode(successBanner.nodeId)
+ */
+export async function waitForNode(
+  query: FindNodeQuery,
+  options: WaitForNodeOptions = {},
+): Promise<AccessibilityNode> {
+  const { timeoutMs = 10000, pollIntervalMs = 500 } = options;
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const tree = await getAccessibilityTree();
+    const found = findInTree(tree, query);
+    if (found) return found;
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break;
+    await new Promise<void>((resolve) =>
+      setTimeout(resolve, Math.min(pollIntervalMs, remaining)),
+    );
+  }
+
+  throw Object.assign(
+    new Error(`waitForNode: node not found within ${timeoutMs}ms`),
+    { name: 'TimeoutError' },
+  );
+}
+
 function nodeMatches(node: AccessibilityNode, query: FindNodeQuery): boolean {
   const hasStringCriteria =
     query.text !== undefined ||
