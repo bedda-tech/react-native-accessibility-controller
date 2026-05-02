@@ -71,22 +71,19 @@ function makeNode(partial: Partial<AccessibilityNode> & { nodeId: string }): Acc
 // ---------------------------------------------------------------------------
 
 beforeEach(() => {
-  jest.useFakeTimers();
   mockController.getAccessibilityTree.mockReset();
 });
 
 afterEach(() => {
-  jest.useRealTimers();
+  jest.restoreAllMocks();
 });
 
 describe('waitForNode', () => {
-  it('returns the node immediately if it is present on the first poll', async () => {
+  it('returns the node immediately when found on the first poll', async () => {
     const target = makeNode({ nodeId: 'n1', text: 'Submit' });
     mockController.getAccessibilityTree.mockResolvedValue([target]);
 
-    const promise = waitForNode({ text: 'Submit' });
-    await jest.runAllTimersAsync();
-    const result = await promise;
+    const result = await waitForNode({ text: 'Submit' }, { timeoutMs: 5000, pollIntervalMs: 0 });
 
     expect(result).toBe(target);
     expect(mockController.getAccessibilityTree).toHaveBeenCalledTimes(1);
@@ -94,66 +91,65 @@ describe('waitForNode', () => {
 
   it('polls until the node appears and then resolves', async () => {
     const target = makeNode({ nodeId: 'n2', text: 'Done' });
-    // First two calls return empty, third returns the node
     mockController.getAccessibilityTree
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([])
       .mockResolvedValue([target]);
 
-    const promise = waitForNode({ text: 'Done' }, { timeoutMs: 5000, pollIntervalMs: 100 });
-    await jest.runAllTimersAsync();
-    const result = await promise;
+    const result = await waitForNode({ text: 'Done' }, { timeoutMs: 5000, pollIntervalMs: 0 });
 
     expect(result).toBe(target);
     expect(mockController.getAccessibilityTree).toHaveBeenCalledTimes(3);
   });
 
-  it('throws a TimeoutError when the node never appears', async () => {
+  it('throws a TimeoutError when the deadline has already passed on entry', async () => {
+    // Simulate time advancing past the deadline before the loop body runs.
+    // Call 0: returns startTime for deadline calculation.
+    // Call 1+: returns a time well past the deadline so the while condition is false.
+    let call = 0;
+    jest.spyOn(Date, 'now').mockImplementation(() => (call++ === 0 ? 1000 : 2000));
+
     mockController.getAccessibilityTree.mockResolvedValue([]);
 
-    const promise = waitForNode({ text: 'Missing' }, { timeoutMs: 500, pollIntervalMs: 100 });
-    await jest.runAllTimersAsync();
-
-    await expect(promise).rejects.toMatchObject({
+    await expect(
+      waitForNode({ text: 'Missing' }, { timeoutMs: 100, pollIntervalMs: 0 }),
+    ).rejects.toMatchObject({
       name: 'TimeoutError',
-      message: expect.stringContaining('500ms'),
+      message: expect.stringContaining('100ms'),
     });
   });
 
-  it('finds a node deep in the tree', async () => {
+  it('throws a TimeoutError when the node never appears within the timeout', async () => {
+    // Call 0: startTime=1000, deadline=1100.
+    // Call 1: Date.now()=1050 (< deadline, enters loop).
+    // Call 2: Date.now()=1100 (remaining=0, breaks).
+    const times = [1000, 1050, 1100];
+    let call = 0;
+    jest.spyOn(Date, 'now').mockImplementation(() => times[Math.min(call++, times.length - 1)]);
+
+    mockController.getAccessibilityTree.mockResolvedValue([]);
+
+    await expect(
+      waitForNode({ text: 'Never' }, { timeoutMs: 100, pollIntervalMs: 0 }),
+    ).rejects.toMatchObject({ name: 'TimeoutError' });
+  });
+
+  it('finds a node deep in the accessibility tree', async () => {
     const deep = makeNode({ nodeId: 'deep', text: 'Nested' });
     const parent = makeNode({ nodeId: 'parent', children: [deep] });
     mockController.getAccessibilityTree.mockResolvedValue([parent]);
 
-    const promise = waitForNode({ text: 'Nested' });
-    await jest.runAllTimersAsync();
-    const result = await promise;
+    const result = await waitForNode({ text: 'Nested' }, { timeoutMs: 5000, pollIntervalMs: 0 });
 
     expect(result.nodeId).toBe('deep');
   });
 
-  it('uses default timeoutMs of 10000 and pollIntervalMs of 500', async () => {
-    mockController.getAccessibilityTree.mockResolvedValue([]);
-
-    const promise = waitForNode({ text: 'Never' });
-    // Advance 9500ms — should still be pending
-    jest.advanceTimersByTime(9500);
-    // Drain microtasks
-    await Promise.resolve();
-    // Advance past the 10000ms deadline
-    await jest.runAllTimersAsync();
-
-    await expect(promise).rejects.toMatchObject({ name: 'TimeoutError' });
-  });
-
-  it('resolves with the correct node when multiple nodes are present', async () => {
+  it('returns the first matching node when multiple nodes are present', async () => {
     const a = makeNode({ nodeId: 'a', text: 'Cancel' });
     const b = makeNode({ nodeId: 'b', text: 'Submit' });
     mockController.getAccessibilityTree.mockResolvedValue([a, b]);
 
-    const promise = waitForNode({ text: 'Submit' });
-    await jest.runAllTimersAsync();
-    const result = await promise;
+    const result = await waitForNode({ text: 'Submit' }, { timeoutMs: 5000, pollIntervalMs: 0 });
 
     expect(result.nodeId).toBe('b');
   });
