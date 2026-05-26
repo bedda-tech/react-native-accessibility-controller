@@ -77,6 +77,51 @@ Add the service declaration to your app's `AndroidManifest.xml`:
 </service>
 ```
 
+## Quick Start
+
+```typescript
+import {
+  isServiceEnabled,
+  requestServiceEnable,
+  getAccessibilityTree,
+  findNode,
+  tapNode,
+  globalAction,
+} from 'react-native-accessibility-controller';
+
+// 1. Ensure the AccessibilityService is enabled
+const enabled = await isServiceEnabled();
+if (!enabled) {
+  await requestServiceEnable(); // opens Android Settings
+  return;
+}
+
+// 2. Read the current screen
+const tree = await getAccessibilityTree();
+console.log(`Found ${tree.length} root nodes`);
+
+// 3. Find a node by its visible text and tap it
+const settingsButton = await findNode({ text: 'Settings' });
+if (settingsButton) {
+  await tapNode(settingsButton.nodeId);
+}
+
+// 4. Or navigate with system actions
+await globalAction('home');   // press Home
+await globalAction('back');   // press Back
+```
+
+For a React hook that keeps the tree live:
+
+```typescript
+import { useAccessibilityTree } from 'react-native-accessibility-controller';
+
+function MyComponent() {
+  const { tree, loading } = useAccessibilityTree({ refreshIntervalMs: 1000 });
+  // tree is re-fetched every second while the component is mounted
+}
+```
+
 ## API
 
 ### Screen Reading
