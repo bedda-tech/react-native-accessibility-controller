@@ -137,39 +137,71 @@ class AccessibilityControllerModule(
         captureScreenshotApi30(promise)
     }
 
+    // The TakeScreenshotCallback.onSuccess parameter type changed in API 36:
+    //   API 30–35: AccessibilityService.ScreenCapture (exposes getHardwareBitmap())
+    //   API 36+  : AccessibilityService.ScreenshotResult (exposes getBitmap())
+    // Both classes were removed from the SDK 36 stubs, so we use a dynamic Proxy
+    // to avoid any compile-time reference to either class.
     @RequiresApi(Build.VERSION_CODES.R)
     private fun captureScreenshotApi30(promise: Promise) {
         try {
             val service = AccessibilityControllerService.instance
                 ?: return promise.reject("ERR_SERVICE_DISABLED", "AccessibilityService is not enabled")
+
+            val callbackIface = AccessibilityService.TakeScreenshotCallback::class.java
+            val proxy = java.lang.reflect.Proxy.newProxyInstance(
+                callbackIface.classLoader,
+                arrayOf(callbackIface)
+            ) { _, method, args ->
+                when (method.name) {
+                    "onSuccess" -> extractAndResolveScreenshot(args?.get(0), promise)
+                    "onFailure" -> {
+                        val code = args?.get(0) as? Int ?: -1
+                        promise.reject("ERR_SCREENSHOT_FAILED", "Screenshot failed: errorCode=$code")
+                    }
+                }
+                null
+            }
+
             service.takeScreenshot(
                 0,   // Display.DEFAULT_DISPLAY
                 reactApplicationContext.mainExecutor,
-                object : AccessibilityService.TakeScreenshotCallback {
-                    override fun onSuccess(screenshot: AccessibilityService.ScreenCapture) {
-                        try {
-                            val hwBitmap  = screenshot.hardwareBitmap
-                            val swBitmap  = hwBitmap.copy(Bitmap.Config.ARGB_8888, false)
-                            val baos      = ByteArrayOutputStream()
-                            swBitmap.compress(Bitmap.CompressFormat.PNG, 100, baos)
-                            val base64    = Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP)
-                            swBitmap.recycle()
-                            screenshot.close()
-                            promise.resolve(base64)
-                        } catch (e: Exception) {
-                            promise.reject("ERR_SCREENSHOT_ENCODE", "Failed to encode screenshot", e)
-                        }
-                    }
-                    override fun onFailure(errorCode: Int) {
-                        promise.reject(
-                            "ERR_SCREENSHOT_FAILED",
-                            "Screenshot capture failed: errorCode=$errorCode"
-                        )
-                    }
-                }
+                proxy as AccessibilityService.TakeScreenshotCallback
             )
         } catch (e: Exception) {
             promise.reject("ERR_SCREENSHOT", "takeScreenshot failed", e)
+        }
+    }
+
+    private fun extractAndResolveScreenshot(screenshotObj: Any?, promise: Promise) {
+        if (screenshotObj == null) {
+            promise.reject("ERR_SCREENSHOT_NULL", "Screenshot callback received null")
+            return
+        }
+        try {
+            // Try getHardwareBitmap() (API 30–35 ScreenCapture) then getBitmap() (API 36+ ScreenshotResult)
+            val hwBitmap: Bitmap = runCatching {
+                screenshotObj.javaClass.getMethod("getHardwareBitmap").invoke(screenshotObj) as Bitmap
+            }.getOrElse {
+                screenshotObj.javaClass.getMethod("getBitmap").invoke(screenshotObj) as Bitmap
+            }
+
+            val swBitmap = if (hwBitmap.config == Bitmap.Config.HARDWARE) {
+                hwBitmap.copy(Bitmap.Config.ARGB_8888, false)
+            } else {
+                hwBitmap
+            }
+
+            val baos  = ByteArrayOutputStream()
+            swBitmap.compress(Bitmap.CompressFormat.PNG, 100, baos)
+            val base64 = Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP)
+
+            if (swBitmap !== hwBitmap) swBitmap.recycle()
+            runCatching { (screenshotObj as? AutoCloseable)?.close() }
+
+            promise.resolve(base64)
+        } catch (e: Exception) {
+            promise.reject("ERR_SCREENSHOT_ENCODE", "Failed to encode screenshot", e)
         }
     }
 

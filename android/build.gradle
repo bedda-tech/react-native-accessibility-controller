@@ -14,12 +14,12 @@ apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
 
 android {
-    compileSdkVersion 34
+    compileSdkVersion 36
     namespace 'com.beddatech.accessibilitycontroller'
 
     defaultConfig {
         minSdkVersion 26   // API 26+ required for GestureDescription (gesture dispatch)
-        targetSdkVersion 34
+        targetSdkVersion 36
     }
 
     compileOptions {

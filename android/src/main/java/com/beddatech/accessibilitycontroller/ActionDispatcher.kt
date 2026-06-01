@@ -29,7 +29,7 @@ object ActionDispatcher {
             return executeOnNode(nodeId) { node ->
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                     @Suppress("NewApi")
-                    node.performAction(AccessibilityNodeInfo.ACTION_IME_ENTER)
+                    node.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.id)
                 } else {
                     // Pre-API-30 fallback: click the node (submits most form fields).
                     node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
@@ -179,7 +179,7 @@ object ActionDispatcher {
         "scrollBackward" -> AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD
         "clearFocus"     -> AccessibilityNodeInfo.ACTION_CLEAR_FOCUS
         "select"         -> AccessibilityNodeInfo.ACTION_SELECT
-        "clearText"      -> AccessibilityNodeInfo.ACTION_CLEAR_TEXT
+        "clearText"      -> AccessibilityNodeInfo.AccessibilityAction.ACTION_CLEAR_TEXT.id
         else             -> null
     }
 }
