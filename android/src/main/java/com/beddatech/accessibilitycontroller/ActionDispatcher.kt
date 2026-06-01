@@ -179,7 +179,7 @@ object ActionDispatcher {
         "scrollBackward" -> AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD
         "clearFocus"     -> AccessibilityNodeInfo.ACTION_CLEAR_FOCUS
         "select"         -> AccessibilityNodeInfo.ACTION_SELECT
-        "clearText"      -> AccessibilityNodeInfo.AccessibilityAction.ACTION_CLEAR_TEXT.id
+        "clearText"      -> AccessibilityNodeInfo.ACTION_CLEAR_TEXT
         else             -> null
     }
 }
