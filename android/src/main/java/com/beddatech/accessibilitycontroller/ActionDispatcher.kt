@@ -36,6 +36,9 @@ object ActionDispatcher {
                 }
             }
         }
+        if (action == "clearText") {
+            return setNodeText(nodeId, "")
+        }
         val androidActionId = jsActionToAndroid(action) ?: return false
         return executeOnNode(nodeId) { node ->
             node.performAction(androidActionId)
@@ -179,7 +182,6 @@ object ActionDispatcher {
         "scrollBackward" -> AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD
         "clearFocus"     -> AccessibilityNodeInfo.ACTION_CLEAR_FOCUS
         "select"         -> AccessibilityNodeInfo.ACTION_SELECT
-        "clearText"      -> AccessibilityNodeInfo.ACTION_CLEAR_TEXT
         else             -> null
     }
 }
