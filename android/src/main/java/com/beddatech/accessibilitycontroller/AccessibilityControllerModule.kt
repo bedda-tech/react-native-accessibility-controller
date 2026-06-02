@@ -2,14 +2,24 @@ package com.beddatech.accessibilitycontroller
 
 import android.accessibilityservice.AccessibilityService
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.graphics.Bitmap
+import android.graphics.PixelFormat
+import android.hardware.display.DisplayManager
+import android.media.ImageReader
+import android.media.projection.MediaProjection
+import android.media.projection.MediaProjectionManager
+import android.net.Uri
 import android.os.Build
+import android.os.Handler
+import android.os.HandlerThread
 import android.provider.Settings
 import android.util.Base64
 import androidx.annotation.RequiresApi
+import com.facebook.react.bridge.ActivityEventListener
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
@@ -18,36 +28,41 @@ import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.ReadableMap
 import com.facebook.react.module.annotations.ReactModule
 import com.facebook.react.modules.core.DeviceEventManagerModule
+import com.facebook.react.turbomodule.core.interfaces.TurboModule
 import java.io.ByteArrayOutputStream
 import java.lang.ref.WeakReference
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * TurboModule entry point for react-native-accessibility-controller.
  *
  * Bridges JavaScript calls to the underlying [AccessibilityControllerService].
- * All methods return Promises that resolve once the native operation completes.
- *
- * Event streaming: JS can subscribe via NativeEventEmitter. Two events are
- * emitted by [AccessibilityControllerService]:
- *   - "onAccessibilityEvent" -- raw a11y events from any foreground app
- *   - "onWindowChange"       -- window focus / foreground app change
+ * Implements [TurboModule] to opt into the JSI fast path on New Architecture.
+ * Implements [ActivityEventListener] for MediaProjection permission results.
+ * Maintains full backward compatibility with the legacy bridge.
  */
 @ReactModule(name = AccessibilityControllerModule.NAME)
 class AccessibilityControllerModule(
     reactContext: ReactApplicationContext
-) : ReactContextBaseJavaModule(reactContext) {
+) : ReactContextBaseJavaModule(reactContext),
+    TurboModule,
+    ActivityEventListener {
 
     companion object {
         const val NAME = "AccessibilityController"
+        private const val MEDIA_PROJECTION_REQUEST_CODE = 0x4445_4654 // "DEFT"
     }
 
+    // MediaProjection state
+    private var mediaProjectionManager: MediaProjectionManager? = null
+    private var mediaProjection: MediaProjection? = null
+    private var pendingProjectionPromise: Promise? = null
+
     init {
-        // Provide the ReactApplicationContext to the service so it can emit
-        // events back to JS without a direct dependency on this module.
         AccessibilityControllerService.reactContextRef =
             WeakReference(reactContext)
 
-        // Wire the overlay stop button to emit an "onOverlayStop" event to JS.
         OverlayManager.onStopRequested = {
             try {
                 reactContext
@@ -55,19 +70,49 @@ class AccessibilityControllerModule(
                     .emit("onOverlayStop", Arguments.createMap())
             } catch (_: Exception) {}
         }
+
+        reactContext.addActivityEventListener(this)
     }
 
     override fun getName(): String = NAME
 
     // -----------------------------------------------------------------------
+    // ActivityEventListener (MediaProjection permission result)
+    // -----------------------------------------------------------------------
+
+    override fun onActivityResult(
+        activity: Activity?,
+        requestCode: Int,
+        resultCode: Int,
+        data: Intent?
+    ) {
+        if (requestCode != MEDIA_PROJECTION_REQUEST_CODE) return
+        val promise = pendingProjectionPromise ?: return
+        pendingProjectionPromise = null
+
+        if (resultCode == Activity.RESULT_OK && data != null) {
+            val mgr = mediaProjectionManager
+            if (mgr == null) {
+                promise.reject("ERR_NO_PROJECTION_MGR", "MediaProjectionManager lost")
+                return
+            }
+            try {
+                mediaProjection = mgr.getMediaProjection(resultCode, data)
+                promise.resolve(true)
+            } catch (e: Exception) {
+                promise.reject("ERR_PROJECTION_SETUP", "Failed to create MediaProjection", e)
+            }
+        } else {
+            promise.resolve(false)
+        }
+    }
+
+    override fun onNewIntent(intent: Intent?) {}
+
+    // -----------------------------------------------------------------------
     // Internal helpers
     // -----------------------------------------------------------------------
 
-    /**
-     * Rejects [promise] with ERR_SERVICE_DISABLED and returns null if the
-     * AccessibilityService is not connected. Returns a non-null unit value
-     * otherwise (use as a guard: `requireService(promise) ?: return`).
-     */
     private fun requireService(promise: Promise): Unit? {
         return if (AccessibilityControllerService.instance == null) {
             promise.reject("ERR_SERVICE_DISABLED", "AccessibilityService is not enabled")
@@ -78,20 +123,14 @@ class AccessibilityControllerModule(
     }
 
     // -----------------------------------------------------------------------
-    // NativeEventEmitter plumbing (required by React Native)
+    // NativeEventEmitter plumbing
     // -----------------------------------------------------------------------
 
-    /** Called when JS adds the first listener for a given event type. */
     @ReactMethod
-    fun addListener(@Suppress("UNUSED_PARAMETER") eventName: String) {
-        // No-op: bookkeeping is handled by React Native internals.
-    }
+    fun addListener(@Suppress("UNUSED_PARAMETER") eventName: String) {}
 
-    /** Called when JS removes listeners. */
     @ReactMethod
-    fun removeListeners(@Suppress("UNUSED_PARAMETER") count: Int) {
-        // No-op: bookkeeping is handled by React Native internals.
-    }
+    fun removeListeners(@Suppress("UNUSED_PARAMETER") count: Int) {}
 
     // -----------------------------------------------------------------------
     // Screen reading
@@ -123,7 +162,7 @@ class AccessibilityControllerModule(
         }
     }
 
-    @SuppressLint("NewApi")   // guarded by the API-level check below
+    @SuppressLint("NewApi")
     @ReactMethod
     fun takeScreenshot(promise: Promise) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
@@ -137,11 +176,6 @@ class AccessibilityControllerModule(
         captureScreenshotApi30(promise)
     }
 
-    // The TakeScreenshotCallback.onSuccess parameter type changed in API 36:
-    //   API 30–35: AccessibilityService.ScreenCapture (exposes getHardwareBitmap())
-    //   API 36+  : AccessibilityService.ScreenshotResult (exposes getBitmap())
-    // Both classes were removed from the SDK 36 stubs, so we use a dynamic Proxy
-    // to avoid any compile-time reference to either class.
     @RequiresApi(Build.VERSION_CODES.R)
     private fun captureScreenshotApi30(promise: Promise) {
         try {
@@ -164,7 +198,7 @@ class AccessibilityControllerModule(
             }
 
             service.takeScreenshot(
-                0,   // Display.DEFAULT_DISPLAY
+                0,
                 reactApplicationContext.mainExecutor,
                 proxy as AccessibilityService.TakeScreenshotCallback
             )
@@ -179,7 +213,6 @@ class AccessibilityControllerModule(
             return
         }
         try {
-            // Try getHardwareBitmap() (API 30–35 ScreenCapture) then getBitmap() (API 36+ ScreenshotResult)
             val hwBitmap: Bitmap = runCatching {
                 screenshotObj.javaClass.getMethod("getHardwareBitmap").invoke(screenshotObj) as Bitmap
             }.getOrElse {
@@ -192,7 +225,7 @@ class AccessibilityControllerModule(
                 hwBitmap
             }
 
-            val baos  = ByteArrayOutputStream()
+            val baos = ByteArrayOutputStream()
             swBitmap.compress(Bitmap.CompressFormat.PNG, 100, baos)
             val base64 = Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP)
 
@@ -389,14 +422,6 @@ class AccessibilityControllerModule(
         }
     }
 
-    /**
-     * Update the content of the existing overlay (action text + step count).
-     * No-op if no overlay is currently shown.
-     *
-     * Config keys:
-     *   - action    (string) – current action text
-     *   - stepCount (number) – current step number
-     */
     @ReactMethod
     fun updateOverlay(config: ReadableMap, promise: Promise) {
         val action = if (config.hasKey("action"))    config.getString("action")            ?: "" else ""
@@ -411,10 +436,6 @@ class AccessibilityControllerModule(
     // Service lifecycle
     // -----------------------------------------------------------------------
 
-    /**
-     * Resolves `true` if the AccessibilityControllerService is currently
-     * listed in Android's enabled accessibility services.
-     */
     @ReactMethod
     fun isServiceEnabled(promise: Promise) {
         try {
@@ -433,10 +454,6 @@ class AccessibilityControllerModule(
         }
     }
 
-    /**
-     * Opens Android's Accessibility Settings screen so the user can enable
-     * the service manually (required by OS policy).
-     */
     @ReactMethod
     fun requestServiceEnable(promise: Promise) {
         try {
@@ -450,10 +467,6 @@ class AccessibilityControllerModule(
         }
     }
 
-    /**
-     * Returns true if the SYSTEM_ALERT_WINDOW ("Draw over other apps") permission
-     * has been granted. Always returns true on API < 23.
-     */
     @ReactMethod
     fun canDrawOverlays(promise: Promise) {
         try {
@@ -463,11 +476,6 @@ class AccessibilityControllerModule(
         }
     }
 
-    /**
-     * Opens the system "Draw over other apps" settings page for this package.
-     * The user must manually toggle the permission. Call canDrawOverlays() after
-     * the user returns to verify the grant. No-op below API 23 (always granted).
-     */
     @ReactMethod
     fun requestOverlayPermission(promise: Promise) {
         try {
@@ -482,6 +490,147 @@ class AccessibilityControllerModule(
             promise.resolve(null)
         } catch (e: Exception) {
             promise.reject("ERR_OVERLAY_PERMISSION", "Failed to open overlay permission settings", e)
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // MediaProjection screenshot
+    //
+    // Three-step API:
+    //   1. requestMediaProjection() — shows system permission dialog → resolves true/false
+    //   2. captureWithMediaProjection() — captures a frame → resolves base64 PNG
+    //   3. releaseMediaProjection() — stops projection and frees resources
+    //
+    // Android 14+ (API 34) note: captureWithMediaProjection() must be called
+    // while a foreground service with foregroundServiceType="mediaProjection" is
+    // running. The deft app's DeftAgentService satisfies this requirement.
+    // -----------------------------------------------------------------------
+
+    @ReactMethod
+    fun requestMediaProjection(promise: Promise) {
+        val activity = currentActivity ?: run {
+            promise.reject("ERR_NO_ACTIVITY", "No current activity")
+            return
+        }
+        try {
+            val mgr = activity.getSystemService(Context.MEDIA_PROJECTION_SERVICE)
+                as MediaProjectionManager
+            mediaProjectionManager = mgr
+            pendingProjectionPromise = promise
+            @Suppress("DEPRECATION")
+            activity.startActivityForResult(
+                mgr.createScreenCaptureIntent(),
+                MEDIA_PROJECTION_REQUEST_CODE
+            )
+        } catch (e: Exception) {
+            pendingProjectionPromise = null
+            promise.reject("ERR_PROJECTION_INTENT", "Failed to start screen capture intent", e)
+        }
+    }
+
+    @ReactMethod
+    fun captureWithMediaProjection(promise: Promise) {
+        val projection = mediaProjection ?: run {
+            promise.reject(
+                "ERR_NO_PROJECTION",
+                "MediaProjection not set up. Call requestMediaProjection() first."
+            )
+            return
+        }
+
+        try {
+            val dm = reactApplicationContext.resources.displayMetrics
+            val width  = dm.widthPixels
+            val height = dm.heightPixels
+            val density = dm.densityDpi
+
+            val imageReader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2)
+            val captureThread = HandlerThread("deft-mp-capture")
+            captureThread.start()
+            val captureHandler = Handler(captureThread.looper)
+
+            // AtomicReference so the listener lambda can close over a variable
+            // that is set after the listener is registered.
+            val virtualDisplayRef = AtomicReference<android.hardware.display.VirtualDisplay?>(null)
+            val promiseSettled = AtomicBoolean(false)
+
+            fun cleanup(vd: android.hardware.display.VirtualDisplay?) {
+                runCatching { vd?.release() }
+                runCatching { imageReader.close() }
+                captureThread.quitSafely()
+            }
+
+            imageReader.setOnImageAvailableListener({ reader ->
+                if (!promiseSettled.compareAndSet(false, true)) return@setOnImageAvailableListener
+                val vd = virtualDisplayRef.get()
+                try {
+                    val image = reader.acquireLatestImage()
+                    if (image == null) {
+                        cleanup(vd)
+                        promise.reject("ERR_NO_IMAGE", "No frame captured from virtual display")
+                        return@setOnImageAvailableListener
+                    }
+                    try {
+                        val plane     = image.planes[0]
+                        val buffer    = plane.buffer
+                        val rowStride = plane.rowStride
+                        val pixStride = plane.pixelStride
+                        val rowPad    = rowStride - pixStride * width
+                        val bmpWidth  = width + rowPad / pixStride
+
+                        val raw = Bitmap.createBitmap(bmpWidth, height, Bitmap.Config.ARGB_8888)
+                        raw.copyPixelsFromBuffer(buffer)
+                        val cropped = if (rowPad > 0) {
+                            Bitmap.createBitmap(raw, 0, 0, width, height).also { raw.recycle() }
+                        } else raw
+
+                        val baos = ByteArrayOutputStream()
+                        cropped.compress(Bitmap.CompressFormat.PNG, 100, baos)
+                        cropped.recycle()
+
+                        val base64 = Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP)
+                        cleanup(vd)
+                        promise.resolve(base64)
+                    } finally {
+                        image.close()
+                    }
+                } catch (e: Exception) {
+                    cleanup(vd)
+                    promise.reject("ERR_CAPTURE_ENCODE", "Failed to encode captured frame", e)
+                }
+            }, captureHandler)
+
+            val vd = projection.createVirtualDisplay(
+                "deft-mp-capture",
+                width, height, density,
+                DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+                imageReader.surface,
+                null, null
+            )
+            virtualDisplayRef.set(vd)
+
+            // Fallback timeout: reject if no frame arrives within 8 seconds.
+            captureHandler.postDelayed({
+                if (promiseSettled.compareAndSet(false, true)) {
+                    cleanup(virtualDisplayRef.get())
+                    promise.reject("ERR_CAPTURE_TIMEOUT", "No frame available within 8s")
+                }
+            }, 8_000L)
+
+        } catch (e: Exception) {
+            promise.reject("ERR_CAPTURE_SETUP", "captureWithMediaProjection setup failed", e)
+        }
+    }
+
+    @ReactMethod
+    fun releaseMediaProjection(promise: Promise) {
+        try {
+            mediaProjection?.stop()
+            mediaProjection = null
+            mediaProjectionManager = null
+            promise.resolve(null)
+        } catch (e: Exception) {
+            promise.reject("ERR_RELEASE_PROJECTION", "releaseMediaProjection failed", e)
         }
     }
 }

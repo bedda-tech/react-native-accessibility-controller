@@ -51,6 +51,13 @@ export interface Spec extends TurboModule {
   canDrawOverlays(): Promise<boolean>;
   requestOverlayPermission(): Promise<void>;
 
+  // MediaProjection screenshot (no AccessibilityService required, API 21+)
+  // On Android 14+ (API 34), the calling app must have a running foreground
+  // service with foregroundServiceType="mediaProjection" before capturing.
+  requestMediaProjection(): Promise<boolean>;
+  captureWithMediaProjection(): Promise<string>;
+  releaseMediaProjection(): Promise<void>;
+
   // Required by NativeEventEmitter
   addListener(eventName: string): void;
   removeListeners(count: number): void;

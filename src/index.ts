@@ -388,6 +388,40 @@ export function onWindowChange(
 }
 
 // ---------------------------------------------------------------------------
+// MediaProjection screenshot (no AccessibilityService required)
+// ---------------------------------------------------------------------------
+
+/**
+ * Ask the user to grant screen-capture permission via the system dialog.
+ * Returns `true` if permission was granted, `false` if denied.
+ *
+ * Must be called before `captureWithMediaProjection()`. On Android 14+, a
+ * foreground service with `foregroundServiceType="mediaProjection"` must be
+ * running before the first capture.
+ */
+export async function requestMediaProjection(): Promise<boolean> {
+  return NativeAccessibilityController.requestMediaProjection();
+}
+
+/**
+ * Capture a screenshot using the previously granted MediaProjection permission.
+ * Returns a base64-encoded PNG string.
+ *
+ * Faster than `takeScreenshot()` and does not require the AccessibilityService.
+ */
+export async function captureWithMediaProjection(): Promise<string> {
+  return NativeAccessibilityController.captureWithMediaProjection();
+}
+
+/**
+ * Stop the active MediaProjection session and release all associated resources.
+ * Call this when screen capture is no longer needed.
+ */
+export async function releaseMediaProjection(): Promise<void> {
+  return NativeAccessibilityController.releaseMediaProjection();
+}
+
+// ---------------------------------------------------------------------------
 // Service lifecycle
 // ---------------------------------------------------------------------------
 

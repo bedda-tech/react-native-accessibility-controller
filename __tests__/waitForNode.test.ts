@@ -36,6 +36,9 @@ jest.mock('../src/NativeAccessibilityController', () => ({
     requestOverlayPermission: jest.fn(),
     addListener: jest.fn(),
     removeListeners: jest.fn(),
+    requestMediaProjection: jest.fn(),
+    captureWithMediaProjection: jest.fn(),
+    releaseMediaProjection: jest.fn(),
   },
 }));
 
