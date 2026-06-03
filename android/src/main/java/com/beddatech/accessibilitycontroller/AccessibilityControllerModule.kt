@@ -81,7 +81,7 @@ class AccessibilityControllerModule(
     // -----------------------------------------------------------------------
 
     override fun onActivityResult(
-        activity: Activity?,
+        activity: Activity,
         requestCode: Int,
         resultCode: Int,
         data: Intent?
@@ -107,7 +107,7 @@ class AccessibilityControllerModule(
         }
     }
 
-    override fun onNewIntent(intent: Intent?) {}
+    override fun onNewIntent(intent: Intent) {}
 
     // -----------------------------------------------------------------------
     // Internal helpers
@@ -508,7 +508,7 @@ class AccessibilityControllerModule(
 
     @ReactMethod
     fun requestMediaProjection(promise: Promise) {
-        val activity = currentActivity ?: run {
+        val activity = reactApplicationContext.currentActivity ?: run {
             promise.reject("ERR_NO_ACTIVITY", "No current activity")
             return
         }
