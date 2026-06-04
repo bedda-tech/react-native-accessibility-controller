@@ -12,6 +12,7 @@ buildscript {
 
 apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
+apply plugin: 'com.facebook.react'
 
 android {
     compileSdkVersion 36
