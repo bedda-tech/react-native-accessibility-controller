@@ -1,6 +1,6 @@
 {
   "name": "react-native-accessibility-controller",
-  "version": "1.2.0",
+  "version": "1.4.0",
   "description": "Android AccessibilityService for React Native. Full read/write access to any app's UI tree, gestures, and system actions.",
   "main": "lib/commonjs/index.js",
   "module": "lib/typescript/index.js",
