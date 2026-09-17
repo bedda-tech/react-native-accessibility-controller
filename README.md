@@ -1,7 +1,6 @@
 # react-native-accessibility-controller
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![npm version](https://img.shields.io/npm/v/react-native-accessibility-controller.svg)](https://www.npmjs.com/package/react-native-accessibility-controller)
 [![build](https://img.shields.io/github/actions/workflow/status/bedda-tech/react-native-accessibility-controller/ci.yml?branch=main)](https://github.com/bedda-tech/react-native-accessibility-controller/actions)
 
 **Android AccessibilityService for React Native.** Full read/write access to any app's UI tree, coordinate-based gestures, and system actions -- all from JavaScript.
