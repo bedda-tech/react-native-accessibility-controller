@@ -7,6 +7,15 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.4.1] – 2026-11-17
+
+First npm release. Packaging and documentation only; no runtime changes since 1.4.0.
+
+### Changed
+- README opens with install line and a 3-line example
+- `prepack` runs the build so `npm pack` never ships a stale `lib/`
+- Publish workflow fails when the git tag does not match `package.json`, and runs tests before publishing
+
 ## [1.4.0] – 2026-06-18
 
 ### Added

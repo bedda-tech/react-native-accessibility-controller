@@ -7,6 +7,21 @@
 
 Part of the [Deft](https://github.com/bedda-tech/deft) ecosystem: an open-source, fully on-device AI phone agent.
 
+```bash
+npm install react-native-accessibility-controller
+```
+
+<!-- TODO before npm publish: record a 20-40 s screen capture of a tap/read sequence, save as docs/demo.gif, and uncomment the line below. -->
+<!-- ![Reading and tapping the UI tree on Android](docs/demo.gif) -->
+
+```typescript
+import { findNode, tapNode, globalAction } from 'react-native-accessibility-controller';
+
+const node = await findNode({ text: 'Settings' });
+if (node) await tapNode(node.nodeId);
+await globalAction('home');
+```
+
 ---
 
 ## Architecture
